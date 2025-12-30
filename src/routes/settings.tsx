@@ -1,24 +1,25 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
 import { useTheme } from '../components/theme-provider'
 import { saveSetting, openConfigFolder, getSettings } from '../lib/store'
 import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart'
-import { useEffect, useState } from 'react'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select'
 import { Label } from '../components/ui/label'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { FolderOpen } from 'lucide-react'
 
 export const Route = createFileRoute('/settings')({
-    component: Settings,
+    component: SettingsTab,
 })
 
-function Settings() {
+function SettingsTab() {
     const { theme, setTheme } = useTheme()
     const [autostartEnabled, setAutostartEnabled] = useState(false)
     const [startMinimized, setStartMinimized] = useState(false)
 
-
-    // State for local input management
+    // Config state
     const [inputValue, setInputValue] = useState(15)
     const [unit, setUnit] = useState<"ms" | "s" | "m">("s")
 
@@ -28,9 +29,8 @@ function Settings() {
 
         // Load settings
         getSettings().then(s => {
-            setStartMinimized(s.startMinimized)
-            const ms = s.revertDelay ?? 15000
-
+            setStartMinimized(s.system.startMinimized)
+            const ms = s.automation.revertDelay
 
             // Set initial unit/value representation
             if (ms % 60000 === 0 && ms !== 0) {
@@ -54,7 +54,10 @@ function Settings() {
                 await disable()
             }
             setAutostartEnabled(checked)
-            await saveSetting('autostart', checked)
+            // Note: We need to save the whole system object if strict, but let's assume partial updates if store supports key path or we read-modify-write.
+            // Simplified: read, modify, write system object.
+            const current = await getSettings();
+            await saveSetting('system', { ...current.system, autostart: checked })
         } catch (e) {
             console.error('Failed to toggle autostart', e)
         }
@@ -62,7 +65,14 @@ function Settings() {
 
     const toggleStartMinimized = async (checked: boolean) => {
         setStartMinimized(checked)
-        await saveSetting('startMinimized', checked)
+        const current = await getSettings();
+        await saveSetting('system', { ...current.system, startMinimized: checked })
+    }
+
+    const updateTheme = async (val: "light" | "dark" | "system") => {
+        setTheme(val)
+        const current = await getSettings();
+        await saveSetting('system', { ...current.system, theme: val })
     }
 
     const updateRevertDelay = async (val: number, newUnit: "ms" | "s" | "m") => {
@@ -71,10 +81,11 @@ function Settings() {
         if (newUnit === 'm') multiplier = 60000
 
         const totalMs = val * multiplier
-
         setInputValue(val)
         setUnit(newUnit)
-        await saveSetting('revertDelay', totalMs)
+
+        const current = await getSettings();
+        await saveSetting('automation', { ...current.automation, revertDelay: totalMs })
     }
 
     const handleValueChange = (valStr: string) => {
@@ -82,7 +93,7 @@ function Settings() {
         if (!isNaN(val) && val >= 0) {
             updateRevertDelay(val, unit)
         } else if (valStr === '') {
-            setInputValue(0) // or handle empty state better if needed
+            setInputValue(0)
         }
     }
 
@@ -91,21 +102,22 @@ function Settings() {
     }
 
     return (
-        <div className="max-w-2xl mx-auto space-y-8">
-            <div>
-                <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
-                <p className="text-muted-foreground">Manage your application preferences.</p>
-            </div>
+        <div className="space-y-6">
 
-            <div className="grid gap-6">
-                <div className="grid grid-cols-1 gap-4 rounded-lg border p-4 shadow-sm">
+            {/* Interface Section */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>Interface</CardTitle>
+                    <CardDescription>Customize the look and feel.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
                     <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
-                            <Label className="text-base">Appearance</Label>
-                            <p className="text-sm text-muted-foreground">Customize the look and feel of the application.</p>
+                            <Label className="text-base">Theme</Label>
+                            <p className="text-sm text-muted-foreground">Select your preferred color scheme.</p>
                         </div>
                         <div className="w-[180px]">
-                            <Select value={theme} onValueChange={(val: any) => setTheme(val)}>
+                            <Select value={theme} onValueChange={(val: any) => updateTheme(val)}>
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
@@ -117,13 +129,20 @@ function Settings() {
                             </Select>
                         </div>
                     </div>
-                </div>
+                </CardContent>
+            </Card>
 
-                <div className="grid grid-cols-1 gap-4 rounded-lg border p-4 shadow-sm">
+            {/* System Section */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>System</CardTitle>
+                    <CardDescription>Manage startup and application behavior.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
                     <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
                             <Label htmlFor="autostart" className="text-base">Autostart</Label>
-                            <p className="text-sm text-muted-foreground">Launch the application automatically when Windows starts.</p>
+                            <p className="text-sm text-muted-foreground">Launch automatically when Windows starts.</p>
                         </div>
                         <div>
                             <input
@@ -135,13 +154,10 @@ function Settings() {
                             />
                         </div>
                     </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 rounded-lg border p-4 shadow-sm">
                     <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
                             <Label htmlFor="startMin" className="text-base">Start Minimized</Label>
-                            <p className="text-sm text-muted-foreground">Launch the application in the background (hidden).</p>
+                            <p className="text-sm text-muted-foreground">Launch in the background (hidden).</p>
                         </div>
                         <div>
                             <input
@@ -153,13 +169,20 @@ function Settings() {
                             />
                         </div>
                     </div>
-                </div>
+                </CardContent>
+            </Card>
 
-                <div className="grid grid-cols-1 gap-4 rounded-lg border p-4 shadow-sm">
+            {/* Automation Section */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>Automation</CardTitle>
+                    <CardDescription>Configure how resolution changes are handled.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
                     <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
                             <Label htmlFor="revertDelay" className="text-base">Revert Delay</Label>
-                            <p className="text-sm text-muted-foreground">Time to wait before reverting resolution after app switch.</p>
+                            <p className="text-sm text-muted-foreground">Time to wait before reverting resolution.</p>
                         </div>
                         <div className="flex items-center gap-2 w-[220px]">
                             <Input
@@ -181,18 +204,27 @@ function Settings() {
                             </Select>
                         </div>
                     </div>
-                </div>
+                </CardContent>
+            </Card>
 
-                <div className="grid grid-cols-1 gap-4 rounded-lg border p-4 shadow-sm">
+            {/* Data Section */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>Data</CardTitle>
+                    <CardDescription>Access configuration files.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
                     <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
-                            <Label className="text-base">Data & Storage</Label>
-                            <p className="text-sm text-muted-foreground">Access your configuration file manually.</p>
+                            <Label className="text-base">Configuration Folder</Label>
+                            <p className="text-sm text-muted-foreground">Open the folder containing config.json and logs.</p>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => openConfigFolder()}>Open Config Folder</Button>
+                        <Button variant="outline" onClick={openConfigFolder}>
+                            <FolderOpen className="mr-2 h-4 w-4" /> Open Folder
+                        </Button>
                     </div>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
         </div>
     )
 }

@@ -86,22 +86,19 @@ export function ResolutionPicker({
 
     return (
         <Popover open={open} onOpenChange={handleOpenChange}>
-            <PopoverTrigger
-                render={(props) => (
-                    <Button
-                        {...props}
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={open}
-                        className={cn("w-full justify-between h-12 text-base font-normal", className)}
-                    >
-                        {displayValue ?? <span className="text-muted-foreground">{placeholder}</span>}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                )}
-            />
+            <PopoverTrigger asChild>
+                <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={open}
+                    className={cn("w-full justify-between h-12 text-base font-normal", className)}
+                >
+                    {displayValue ?? <span className="text-muted-foreground">{placeholder}</span>}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+            </PopoverTrigger>
             <PopoverContent
-                className="w-[400px] p-0"
+                className="w-[450px] p-0"
                 align="start"
                 side="bottom"
             >

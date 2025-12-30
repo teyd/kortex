@@ -1,10 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { getSupportedResolutions, getCurrentResolution, setResolution, type Resolution } from '../lib/store'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { ResolutionPicker } from '../components/resolution-picker'
-import { Monitor, RefreshCw } from 'lucide-react'
+import { Monitor, RefreshCw, MonitorCheck } from 'lucide-react'
 
 export const Route = createFileRoute('/')({
     component: Index,
@@ -64,11 +64,6 @@ function Index() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h2 className="text-2xl font-bold tracking-tight">Manual Control</h2>
-                <p className="text-muted-foreground">Manually change your display resolution.</p>
-            </div>
-
             <Card>
                 <CardHeader>
                     <div className="flex items-center justify-between">
@@ -93,19 +88,30 @@ function Index() {
                     <CardTitle>Change Resolution</CardTitle>
                     <CardDescription>Select resolution and refresh rate.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-4 flex flex-col">
                     <ResolutionPicker
                         resolutions={resolutions}
                         value={pickerValue}
                         onChange={setPickerValue}
                         placeholder="Select resolution..."
+                        className="h-10 text-sm"
                     />
                     <Button
                         onClick={handleApply}
                         disabled={!pickerValue || applying}
-                        className="w-full h-12 text-lg"
+                        className="w-[300px] h-10 text-sm"
                     >
-                        {applying ? 'Applying...' : 'Apply Resolution'}
+                        {applying ? (
+                            <>
+                                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                Applying...
+                            </>
+                        ) : (
+                            <>
+                                <MonitorCheck className="mr-2 h-4 w-4" />
+                                Apply Resolution
+                            </>
+                        )}
                     </Button>
                 </CardContent>
             </Card>

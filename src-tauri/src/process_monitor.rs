@@ -20,10 +20,12 @@ use windows::Win32::{
 pub struct ProcessInfo {
     pub pid: u32,
     pub name: String,
+    pub memory: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResolutionRule {
+#[serde(rename_all = "camelCase")]
+pub struct ResolutionProfile {
     pub process_name: String,
     pub width: u32,
     pub height: u32,
@@ -45,13 +47,20 @@ pub fn get_running_processes() -> Vec<ProcessInfo> {
     let mut sys = System::new_all();
     sys.refresh_processes(ProcessesToUpdate::All, true);
 
-    sys.processes()
+    let mut procs: Vec<ProcessInfo> = sys
+        .processes()
         .iter()
         .map(|(pid, process)| ProcessInfo {
             pid: pid.as_u32(),
             name: process.name().to_string_lossy().into_owned(),
+            memory: process.memory(),
         })
-        .collect()
+        .collect();
+
+    // Sort by Memory Usage (Descending)
+    procs.sort_by(|a, b| b.memory.cmp(&a.memory));
+
+    procs
 }
 
 // Hook Callback
@@ -116,8 +125,8 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
     };
 
     let stores = app_handle.store("config.json");
-    let rules: Vec<ResolutionRule> = if let Ok(store) = stores {
-        if let Some(value) = store.get("rules") {
+    let profiles: Vec<ResolutionProfile> = if let Ok(store) = stores {
+        if let Some(value) = store.get("profiles") {
             serde_json::from_value(value.clone()).unwrap_or_default()
         } else {
             Vec::new()
@@ -134,25 +143,34 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
     if let Some(state_arc) = state_arc {
         let mut state = state_arc.lock().unwrap();
 
+        // Debug logging for rules
+        log::info!(
+            "[{}] Checking {} profiles against process '{}'",
+            source,
+            profiles.len(),
+            process_name
+        );
+
         // Check for match
-        let mut matched_rule: Option<ResolutionRule> = None;
-        for rule in rules {
-            if process_name.eq_ignore_ascii_case(&rule.process_name) {
-                matched_rule = Some(rule);
+        let mut matched_profile: Option<ResolutionProfile> = None;
+        for profile in profiles {
+            log::info!("  -> Checking profile: '{}'", profile.process_name);
+            if process_name.eq_ignore_ascii_case(&profile.process_name) {
+                matched_profile = Some(profile);
                 break;
             }
         }
 
-        if let Some(rule) = matched_rule {
+        if let Some(profile) = matched_profile {
             // We are inside a target process
             // 1. Cancel any pending revert
             state.revert_pending = None;
 
-            if state.active_process.as_deref() != Some(&rule.process_name) {
+            if state.active_process.as_deref() != Some(&profile.process_name) {
                 log::info!(
                     "[{}] MATCH! Changing resolution for: {}",
                     source,
-                    rule.process_name
+                    profile.process_name
                 );
 
                 if state.original_resolution.is_none() {
@@ -168,15 +186,15 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
                 }
 
                 let target_res = Resolution {
-                    width: rule.width,
-                    height: rule.height,
-                    frequency: rule.frequency,
+                    width: profile.width,
+                    height: profile.height,
+                    frequency: profile.frequency,
                 };
 
                 if let Err(e) = change_resolution(target_res) {
                     log::error!("Failed to set resolution: {}", e);
                 } else {
-                    state.active_process = Some(rule.process_name);
+                    state.active_process = Some(profile.process_name);
                     log::info!("Resolution Set!");
                 }
             }
@@ -251,28 +269,54 @@ pub fn start_monitor_hook(app: AppHandle) {
                 let mut state = state_arc.lock().unwrap();
 
                 if let Some(pending_time) = state.revert_pending {
-                    // Check config for delay
-                    let delay_ms = if let Ok(store) = app_handle_thread.store("config.json") {
-                        if let Some(val) = store.get("revertDelay") {
-                            val.as_u64().unwrap_or(15000)
+                    // Check config for delay and default profile
+                    let (delay_ms, default_profile) =
+                        if let Ok(store) = app_handle_thread.store("config.json") {
+                            if let Some(val) = store.get("automation") {
+                                let delay = val
+                                    .get("revertDelay")
+                                    .and_then(|v| v.as_u64())
+                                    .unwrap_or(15000);
+
+                                let def_prof: Option<Resolution> = val
+                                    .get("defaultProfile")
+                                    .and_then(|v| serde_json::from_value(v.clone()).ok());
+
+                                (delay, def_prof)
+                            } else {
+                                (15000, None)
+                            }
                         } else {
-                            15000
-                        }
-                    } else {
-                        15000
-                    };
+                            (15000, None)
+                        };
 
                     if pending_time.elapsed() > Duration::from_millis(delay_ms) {
                         if let Some(active) = &state.active_process {
                             log::info!("Revert timer expired for {}. Reverting now.", active);
 
-                            if let Some(original) = state.original_resolution.clone() {
-                                if let Err(e) = change_resolution(original) {
+                            // Prioritize Default Profile, then Original Resolution
+                            let target = if let Some(def) = default_profile {
+                                log::info!(
+                                    "Using Default Profile resolution: {}x{}@{}",
+                                    def.width,
+                                    def.height,
+                                    def.frequency
+                                );
+                                Some(def)
+                            } else {
+                                state.original_resolution.clone()
+                            };
+
+                            if let Some(res) = target {
+                                if let Err(e) = change_resolution(res) {
                                     log::error!("Failed to revert: {}", e);
                                 } else {
                                     log::info!("Reverted successfully.");
                                 }
+                            } else {
+                                log::warn!("No resolution to revert to (no Default Profile and no Original saved).");
                             }
+
                             state.active_process = None;
                             state.original_resolution = None;
                         }

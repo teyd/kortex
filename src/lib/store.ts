@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 export type Theme = "dark" | "light" | "system";
 
-export interface ResolutionRule {
+export interface ResolutionProfile {
     processName: string;
     width: number;
     height: number;
@@ -11,11 +11,16 @@ export interface ResolutionRule {
 }
 
 export interface AppSettings {
-    theme: Theme;
-    autostart: boolean;
-    startMinimized: boolean;
-    rules: ResolutionRule[];
-    revertDelay: number;
+    system: {
+        theme: Theme;
+        autostart: boolean;
+        startMinimized: boolean;
+    };
+    automation: {
+        revertDelay: number;
+        defaultProfile?: Resolution;
+    };
+    profiles: ResolutionProfile[];
 }
 
 const STORE_PATH = 'config.json';
@@ -26,18 +31,25 @@ export async function getStore() {
 
 export async function getSettings(): Promise<AppSettings> {
     const store = await getStore();
-    const theme = await store.get<Theme>('theme');
-    const autostart = await store.get<boolean>('autostart');
-    const startMinimized = await store.get<boolean>('startMinimized');
-    const rules = await store.get<ResolutionRule[]>('rules');
-    const revertDelay = await store.get<number>('revertDelay');
+
+    // Legacy migration check or default handling would go here, 
+    // but we will assume clean state or overwrite for this overhaul.
+
+    const system = await store.get<{ theme: Theme; autostart: boolean; startMinimized: boolean }>('system');
+    const automation = await store.get<{ revertDelay: number; defaultProfile?: Resolution }>('automation');
+    const profiles = await store.get<ResolutionProfile[]>('profiles');
 
     return {
-        theme: theme ?? 'system',
-        autostart: autostart ?? false,
-        startMinimized: startMinimized ?? false,
-        rules: rules ?? [],
-        revertDelay: revertDelay ?? 15
+        system: {
+            theme: system?.theme ?? 'system',
+            autostart: system?.autostart ?? false,
+            startMinimized: system?.startMinimized ?? false
+        },
+        automation: {
+            revertDelay: automation?.revertDelay ?? 15000,
+            defaultProfile: automation?.defaultProfile
+        },
+        profiles: profiles ?? []
     };
 }
 
@@ -50,6 +62,7 @@ export async function saveSetting<K extends keyof AppSettings>(key: K, value: Ap
 export interface ProcessInfo {
     pid: number;
     name: string;
+    memory: number;
 }
 
 export interface Resolution {
