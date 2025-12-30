@@ -25,8 +25,33 @@ export interface AppSettings {
 
 const STORE_PATH = 'config.json';
 
+const defaultSettings: AppSettings = {
+    system: {
+        theme: 'system',
+        autostart: false,
+        startMinimized: false
+    },
+    automation: {
+        revertDelay: 15000,
+        defaultProfile: undefined
+    },
+    profiles: []
+};
+
 export async function getStore() {
-    return await load(STORE_PATH, { autoSave: true, defaults: {} });
+    return await load(STORE_PATH, { autoSave: true, defaults: defaultSettings as any });
+}
+
+export async function initStore() {
+    const store = await getStore();
+    // Check if keys exist, if not, save defaults to ensure file is populated
+    const hasSystem = await store.has('system');
+    if (!hasSystem) {
+        await store.set('system', defaultSettings.system);
+        await store.set('automation', defaultSettings.automation);
+        await store.set('profiles', defaultSettings.profiles);
+        await store.save();
+    }
 }
 
 export async function getSettings(): Promise<AppSettings> {
@@ -41,15 +66,15 @@ export async function getSettings(): Promise<AppSettings> {
 
     return {
         system: {
-            theme: system?.theme ?? 'system',
-            autostart: system?.autostart ?? false,
-            startMinimized: system?.startMinimized ?? false
+            theme: system?.theme ?? defaultSettings.system.theme,
+            autostart: system?.autostart ?? defaultSettings.system.autostart,
+            startMinimized: system?.startMinimized ?? defaultSettings.system.startMinimized
         },
         automation: {
-            revertDelay: automation?.revertDelay ?? 15000,
-            defaultProfile: automation?.defaultProfile
+            revertDelay: automation?.revertDelay ?? defaultSettings.automation.revertDelay,
+            defaultProfile: automation?.defaultProfile ?? defaultSettings.automation.defaultProfile
         },
-        profiles: profiles ?? []
+        profiles: profiles ?? defaultSettings.profiles
     };
 }
 

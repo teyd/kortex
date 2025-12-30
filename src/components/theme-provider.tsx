@@ -28,9 +28,16 @@ export function ThemeProvider({
 
     // Load from store on mount
     useEffect(() => {
-        getSettings().then((settings) => {
-            setThemeState(settings.theme)
-        })
+        const init = async () => {
+            // We can initialize the store here to ensure file exists
+            const { initStore } = await import('../lib/store');
+            await initStore();
+
+            getSettings().then((settings) => {
+                setThemeState(settings.system.theme)
+            })
+        }
+        init()
     }, [])
 
     useEffect(() => {
@@ -51,9 +58,10 @@ export function ThemeProvider({
         root.classList.add(theme)
     }, [theme])
 
-    const setTheme = (theme: Theme) => {
-        saveSetting('theme', theme)
-        setThemeState(theme)
+    const setTheme = async (newTheme: Theme) => {
+        const currentSettings = await getSettings();
+        await saveSetting('system', { ...currentSettings.system, theme: newTheme })
+        setThemeState(newTheme)
     }
 
     return (
