@@ -6,7 +6,7 @@ import { List, Settings2, Gamepad2, Info } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useEffect, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
 
 export const Route = createRootRoute({
     component: RootComponent,
@@ -35,26 +35,24 @@ function ResolutionIndicator() {
     if (!visible || !status) return null
 
     return (
-        <TooltipProvider>
-            <Tooltip delayDuration={0}>
-                <TooltipTrigger asChild>
-                    <div className={cn(
-                        "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium cursor-help transition-all animate-in fade-in slide-in-from-top-2",
-                        status.status === 'changed' ? "bg-primary/15 text-primary" : "bg-yellow-500/15 text-yellow-600 dark:text-yellow-500"
-                    )}>
-                        <Info className="h-3.5 w-3.5" />
-                        {status.status === 'changed' ? 'Resolution Active' : 'Revert Pending'}
-                    </div>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">
-                    <div className="space-y-1">
-                        {status.process && <p><span className="font-semibold">Process:</span> {status.process}</p>}
-                        {status.resolution && <p><span className="font-semibold">Target:</span> {status.resolution}</p>}
-                        {status.status === 'revert-pending' && <p className="italic text-muted-foreground">Will revert after delay</p>}
-                    </div>
-                </TooltipContent>
-            </Tooltip>
-        </TooltipProvider>
+        <Tooltip>
+            <TooltipTrigger>
+                <div className={cn(
+                    "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium cursor-help transition-all animate-in fade-in slide-in-from-top-2",
+                    status.status === 'changed' ? "bg-primary/15 text-primary" : "bg-yellow-500/15 text-yellow-600 dark:text-yellow-500"
+                )}>
+                    <Info className="h-3.5 w-3.5" />
+                    {status.status === 'changed' ? 'Resolution Active' : 'Revert Pending'}
+                </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">
+                <div className="space-y-1">
+                    {status.process && <p><span className="font-semibold">Process:</span> {status.process}</p>}
+                    {status.resolution && <p><span className="font-semibold">Target:</span> {status.resolution}</p>}
+                    {status.status === 'revert-pending' && <p className="italic text-muted-foreground">Will revert after delay</p>}
+                </div>
+            </TooltipContent>
+        </Tooltip>
     )
 }
 
