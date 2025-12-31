@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { useTheme } from '../components/theme-provider'
-import { saveConfig, getConfig, openConfigFolder } from '../lib/store'
+import { saveConfig, getConfig, openConfigFolder, getAppVersion } from '../lib/store'
 import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select'
 import { Label } from '../components/ui/label'
@@ -18,6 +18,7 @@ function SettingsTab() {
     const { theme, setTheme } = useTheme()
     const [autostartEnabled, setAutostartEnabled] = useState(false)
     const [startMinimized, setStartMinimized] = useState(false)
+    const [version, setVersion] = useState("")
 
     // Config state
     const [inputValue, setInputValue] = useState(15)
@@ -26,6 +27,8 @@ function SettingsTab() {
     useEffect(() => {
         // Check autostart status
         isEnabled().then(setAutostartEnabled).catch(err => console.error("Autostart check failed:", err))
+
+        getAppVersion().then(setVersion)
 
         // Load settings
         getConfig().then(c => {
@@ -218,11 +221,11 @@ function SettingsTab() {
                 <CardContent className="space-y-4">
                     <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
-                            <Label className="text-base">Configuration Folder</Label>
-                            <p className="text-sm text-muted-foreground">Open the folder containing config.json and logs.</p>
+                            <Label className="text-base font-medium">App Version</Label>
+                            <p className="text-sm text-muted-foreground font-mono">{version}</p>
                         </div>
                         <Button variant="outline" onClick={openConfigFolder}>
-                            <FolderOpen className="mr-2 h-4 w-4" /> Open Folder
+                            <FolderOpen className="mr-2 h-4 w-4" /> Open Config Folder
                         </Button>
                     </div>
                 </CardContent>

@@ -1,6 +1,6 @@
 [package]
 name = "dynres"
-version = "0.4.1"
+version = "0.5.0"
 description = "Dynamic resolution switching based on active process"
 authors = ["teyd"]
 license = "MIT"

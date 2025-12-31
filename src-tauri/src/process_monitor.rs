@@ -5,7 +5,6 @@ use std::time::{Duration, Instant};
 use sysinfo::{Pid, ProcessesToUpdate, System};
 use tauri::AppHandle;
 use tauri::Emitter;
-use tauri_plugin_store::StoreExt;
 use windows::Win32::{
     Foundation::HWND,
     UI::{
@@ -24,14 +23,7 @@ pub struct ProcessInfo {
     pub memory: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ResolutionProfile {
-    pub process_name: String,
-    pub width: u32,
-    pub height: u32,
-    pub frequency: u32,
-}
+// ResolutionProfile removed (dead code)
 
 // Global state for key monitoring data
 struct MonitorState {

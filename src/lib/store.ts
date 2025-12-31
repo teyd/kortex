@@ -72,3 +72,7 @@ export async function setResolution(width: number, height: number, frequency: nu
 export async function openConfigFolder() {
     return await invoke('open_config_folder');
 }
+
+export async function getAppVersion(): Promise<string> {
+    return await invoke('get_app_version');
+}

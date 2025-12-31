@@ -2,7 +2,7 @@ mod config_manager;
 mod process_monitor;
 mod resolution_manager;
 
-use config_manager::{get_config, save_config, AppConfig};
+use config_manager::{get_config, save_config};
 use process_monitor::{start_monitor_hook, ProcessInfo};
 use resolution_manager::Resolution;
 use tauri::Manager;
@@ -10,6 +10,11 @@ use tauri::Manager;
 #[tauri::command]
 fn get_resolutions() -> Vec<Resolution> {
     resolution_manager::get_supported_resolutions()
+}
+
+#[tauri::command]
+fn get_app_version(app: tauri::AppHandle) -> String {
+    app.package_info().version.to_string()
 }
 
 #[tauri::command]
@@ -122,7 +127,8 @@ pub fn run() {
             fetch_processes,
             open_config_folder,
             get_config,
-            save_config
+            save_config,
+            get_app_version
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
