@@ -255,7 +255,7 @@ function ProfilesTab() {
                 </CardContent>
             </Card>
 
-            <Card className="border-muted-foreground/20 bg-muted/10">
+            <Card>
                 <CardHeader>
                     <CardTitle>Default Profile (Lowest Priority)</CardTitle>
                     <CardDescription>
@@ -271,6 +271,7 @@ function ProfilesTab() {
                             value={defaultProfileValue}
                             onChange={handleDefaultProfileChange}
                             placeholder="Use System Default (No Change)"
+                            className="h-10 text-sm"
                         />
                     </div>
                 </CardContent>

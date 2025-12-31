@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use sysinfo::{Pid, ProcessesToUpdate, System};
 use tauri::AppHandle;
+use tauri::Emitter;
 use tauri_plugin_store::StoreExt;
 use windows::Win32::{
     Foundation::HWND,
@@ -194,8 +195,14 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
                 if let Err(e) = change_resolution(target_res) {
                     log::error!("Failed to set resolution: {}", e);
                 } else {
-                    state.active_process = Some(profile.process_name);
+                    state.active_process = Some(profile.process_name.clone());
                     log::info!("Resolution Set!");
+
+                    let _ = app_handle.emit("resolution-changed", serde_json::json!({
+                    "process": profile.process_name,
+                    "resolution": format!("{}x{}@{}Hz", profile.width, profile.height, profile.frequency),
+                    "status": "changed"
+                }));
                 }
             }
         } else {
@@ -203,12 +210,21 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
             // If we have an active process, we might need to revert
             if let Some(active) = &state.active_process {
                 if state.revert_pending.is_none() {
+                    let active_name = active.clone();
                     log::info!(
                         "[{}] Lost focus of {}. Starting revert timer (15s).",
                         source,
-                        active
+                        active_name
                     );
                     state.revert_pending = Some(Instant::now());
+
+                    let _ = app_handle.emit(
+                        "resolution-changed",
+                        serde_json::json!({
+                            "process": active_name,
+                            "status": "revert-pending"
+                        }),
+                    );
                 }
             }
         }
@@ -312,6 +328,12 @@ pub fn start_monitor_hook(app: AppHandle) {
                                     log::error!("Failed to revert: {}", e);
                                 } else {
                                     log::info!("Reverted successfully.");
+                                    let _ = app_handle_thread.emit(
+                                        "resolution-changed",
+                                        serde_json::json!({
+                                                "status": "reverted"
+                                        }),
+                                    );
                                 }
                             } else {
                                 log::warn!("No resolution to revert to (no Default Profile and no Original saved).");
