@@ -153,10 +153,28 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
 
         // Check for match
         let mut matched_profile: Option<(String, Resolution)> = None;
-        for (proc_name, res) in profiles {
-            log::info!("  -> Checking profile: '{}'", proc_name);
-            if process_name.eq_ignore_ascii_case(&proc_name) {
-                matched_profile = Some((proc_name, res));
+
+        // Prepare process name variants for matching
+        let proc_lower = process_name.to_lowercase();
+        let proc_stem = std::path::Path::new(&process_name)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or(&process_name)
+            .to_lowercase();
+
+        // Optimized lookup: Iterate once checking both exact and stem matches
+        for (key, res) in profiles {
+            let key_lower = key.to_lowercase();
+
+            // 1. Exact Match (Case-Insensitive) | e.g. "cs2.exe" == "CS2.EXE"
+            if proc_lower == key_lower {
+                matched_profile = Some((key, res));
+                break;
+            }
+
+            // 2. Stem Match (Case-Insensitive) | e.g. "cs2.exe" (stem: cs2) == "CS2"
+            if proc_stem == key_lower {
+                matched_profile = Some((key, res));
                 break;
             }
         }

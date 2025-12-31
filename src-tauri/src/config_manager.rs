@@ -1,13 +1,11 @@
+use log;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::Mutex;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Manager};
 
 use crate::resolution_manager::Resolution;
-
-// Shared Resolution struct is imported from resolution_manager
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UiConfig {
@@ -68,8 +66,11 @@ pub fn get_config(app: AppHandle) -> AppConfig {
     let path = get_config_path(&app);
     if path.exists() {
         if let Ok(content) = fs::read_to_string(&path) {
-            if let Ok(config) = serde_json::from_str(&content) {
-                return config;
+            match serde_json::from_str::<AppConfig>(&content) {
+                Ok(config) => return config,
+                Err(e) => {
+                    log::error!("Failed to parse config.json: {}", e);
+                }
             }
         }
     }
