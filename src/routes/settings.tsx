@@ -116,9 +116,9 @@ function SettingsTab() {
                             <Label className="text-base">Theme</Label>
                             <p className="text-sm text-muted-foreground">Select your preferred color scheme.</p>
                         </div>
-                        <div className="w-[180px]">
+                        <div className="flex justify-end min-w-[180px]">
                             <Select value={theme} onValueChange={(val: any) => updateTheme(val)}>
-                                <SelectTrigger>
+                                <SelectTrigger className="w-[180px]">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
