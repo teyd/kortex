@@ -12,6 +12,17 @@ The application consists of a Rust-based backend (Tauri) that monitors process c
 
 When a recognized process (e.g., a specific game EXE) becomes the active window, DynRes applies the resolution and refresh rate settings you've configured for that profile. When you tab out or close the process, it reverts to your default desktop settings after a configurable delay.
 
+## Screenshots
+
+![Profiles](https://i.nuuls.com/dK603.png)
+*Manage resolution profiles for your games.*
+
+![Settings](https://i.nuuls.com/fRf-r.png)
+*Configure settings and automation behavior.*
+
+![Manual](https://i.nuuls.com/QUOaM.png)
+*Manual resolution change.*
+
 ## Build Yourself
 
 To build DynRes from source, ensure you have [Rust](https://rustup.rs/) and [Bun](https://bun.sh/) installed.
