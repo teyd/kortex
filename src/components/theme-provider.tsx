@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react"
-import { getSettings, saveSetting, type Theme } from "../lib/store"
+import { getConfig, saveConfig, type Theme } from "../lib/store"
 
 type ThemeProviderProps = {
     children: React.ReactNode
@@ -29,12 +29,12 @@ export function ThemeProvider({
     // Load from store on mount
     useEffect(() => {
         const init = async () => {
-            // We can initialize the store here to ensure file exists
-            const { initStore } = await import('../lib/store');
-            await initStore();
+            // Store init is handled by backend now
+            // const { initStore } = await import('../lib/store');
+            // await initStore();
 
-            getSettings().then((settings) => {
-                setThemeState(settings.system.theme)
+            getConfig().then((config) => {
+                setThemeState(config.ui.theme)
             })
         }
         init()
@@ -59,8 +59,9 @@ export function ThemeProvider({
     }, [theme])
 
     const setTheme = async (newTheme: Theme) => {
-        const currentSettings = await getSettings();
-        await saveSetting('system', { ...currentSettings.system, theme: newTheme })
+        const config = await getConfig();
+        config.ui.theme = newTheme;
+        await saveConfig(config);
         setThemeState(newTheme)
     }
 

@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { useTheme } from '../components/theme-provider'
-import { saveSetting, openConfigFolder, getSettings } from '../lib/store'
+import { saveConfig, getConfig, openConfigFolder } from '../lib/store'
 import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select'
 import { Label } from '../components/ui/label'
@@ -28,9 +28,9 @@ function SettingsTab() {
         isEnabled().then(setAutostartEnabled).catch(err => console.error("Autostart check failed:", err))
 
         // Load settings
-        getSettings().then(s => {
-            setStartMinimized(s.system.startMinimized)
-            const ms = s.automation.revertDelay
+        getConfig().then(c => {
+            setStartMinimized(c.system.startMinimized)
+            const ms = c.automation.revertDelay
 
             // Set initial unit/value representation
             if (ms % 60000 === 0 && ms !== 0) {
@@ -54,10 +54,9 @@ function SettingsTab() {
                 await disable()
             }
             setAutostartEnabled(checked)
-            // Note: We need to save the whole system object if strict, but let's assume partial updates if store supports key path or we read-modify-write.
-            // Simplified: read, modify, write system object.
-            const current = await getSettings();
-            await saveSetting('system', { ...current.system, autostart: checked })
+            const config = await getConfig();
+            config.system.autostart = checked;
+            await saveConfig(config);
         } catch (e) {
             console.error('Failed to toggle autostart', e)
         }
@@ -65,14 +64,16 @@ function SettingsTab() {
 
     const toggleStartMinimized = async (checked: boolean) => {
         setStartMinimized(checked)
-        const current = await getSettings();
-        await saveSetting('system', { ...current.system, startMinimized: checked })
+        const config = await getConfig();
+        config.system.startMinimized = checked;
+        await saveConfig(config);
     }
 
     const updateTheme = async (val: "light" | "dark" | "system") => {
         setTheme(val)
-        const current = await getSettings();
-        await saveSetting('system', { ...current.system, theme: val })
+        // Theme saving is handled by setTheme context, but if we want to force explicit save here:
+        // Actually setTheme in provider already saves it. So just calling setTheme is enough?
+        // Let's check provider implementation. Yes, provider calls saveConfig.
     }
 
     const updateRevertDelay = async (val: number, newUnit: "ms" | "s" | "m") => {
@@ -84,8 +85,9 @@ function SettingsTab() {
         setInputValue(val)
         setUnit(newUnit)
 
-        const current = await getSettings();
-        await saveSetting('automation', { ...current.automation, revertDelay: totalMs })
+        const config = await getConfig();
+        config.automation.revertDelay = totalMs;
+        await saveConfig(config);
     }
 
     const handleValueChange = (valStr: string) => {

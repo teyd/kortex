@@ -1,10 +1,11 @@
+mod config_manager;
 mod process_monitor;
 mod resolution_manager;
 
+use config_manager::{get_config, save_config, AppConfig};
 use process_monitor::{start_monitor_hook, ProcessInfo};
 use resolution_manager::Resolution;
 use tauri::Manager;
-use tauri_plugin_store::StoreExt;
 
 #[tauri::command]
 fn get_resolutions() -> Vec<Resolution> {
@@ -33,8 +34,10 @@ fn fetch_processes() -> Vec<ProcessInfo> {
 #[tauri::command]
 fn open_config_folder(app: tauri::AppHandle) {
     if let Ok(path) = app.path().app_config_dir() {
+        if !path.exists() {
+            let _ = std::fs::create_dir_all(&path);
+        }
         use std::process::Command;
-        // Windows specific explorer launch
         #[cfg(target_os = "windows")]
         let _ = Command::new("explorer").arg(path).spawn();
     }
@@ -53,7 +56,6 @@ pub fn run() {
                 .set_focus();
         }))
         .plugin(tauri_plugin_autostart::Builder::new().build())
-        .plugin(tauri_plugin_store::Builder::default().build())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 window.hide().unwrap();
@@ -69,28 +71,12 @@ pub fn run() {
                 );
             }
 
-            // Custom Store Initialization (Local to Executable)
-            let store_path = std::env::current_exe()
-                .unwrap_or_default()
-                .parent()
-                .unwrap_or_else(|| std::path::Path::new("."))
-                .join("config.json");
-
-            let store = app.handle().store(store_path.clone());
-
-            match store {
-                Ok(store) => {
-                    // tauri-plugin-store in Rust loads from disk.
-                    // Schema is now: { "system": { "startMinimized": boolean, ... }, ... }
-                    if let Some(system) = store.get("system") {
-                        if let Some(true) = system.get("startMinimized").and_then(|v| v.as_bool()) {
-                            if let Some(window) = app.get_webview_window("main") {
-                                window.hide().unwrap();
-                            }
-                        }
-                    }
+            // Load config for startup
+            let config = config_manager::get_config(app.handle().clone());
+            if config.system.start_minimized {
+                if let Some(window) = app.get_webview_window("main") {
+                    window.hide().unwrap();
                 }
-                Err(_) => {}
             }
 
             // Tray Implementation
@@ -134,7 +120,9 @@ pub fn run() {
             get_current_res,
             set_resolution,
             fetch_processes,
-            open_config_folder
+            open_config_folder,
+            get_config,
+            save_config
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

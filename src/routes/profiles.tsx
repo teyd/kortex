@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
-import { getSettings, saveSetting, fetchProcesses, getSupportedResolutions, type ResolutionProfile, type ProcessInfo, type Resolution } from '../lib/store'
+import { getConfig, saveConfig, fetchProcesses, getSupportedResolutions, type ResolutionProfile, type ProcessInfo, type Resolution } from '../lib/store'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { ProcessPicker } from '../components/process-picker'
@@ -93,11 +93,18 @@ function ProfilesTab() {
     const loadData = async () => {
         setLoading(true)
         try {
-            const settings = await getSettings()
-            setProfiles(settings.profiles)
+            const config = await getConfig()
 
-            if (settings.automation.defaultProfile) {
-                const def = settings.automation.defaultProfile
+            // Convert Record -> Array for sorting/display
+            const profileList: ResolutionProfile[] = Object.entries(config.automation.profiles).map(([name, res]) => ({
+                processName: name,
+                ...res
+            }));
+
+            setProfiles(profileList)
+
+            if (config.automation.defaultProfile) {
+                const def = config.automation.defaultProfile
                 setDefaultProfileValue({
                     resolution: `${def.width}x${def.height}`,
                     refreshRate: def.frequency.toString()
@@ -106,7 +113,6 @@ function ProfilesTab() {
 
             const procs = await fetchProcesses()
             const uniqueProcs = Array.from(new Map(procs.map(p => [p.name, p])).values())
-            // uniqueProcs.sort((a, b) => a.name.localeCompare(b.name)) // Correctly using memory sort from backend now
             setProcesses(uniqueProcs)
 
             const resList = await getSupportedResolutions()
@@ -131,18 +137,30 @@ function ProfilesTab() {
             frequency: freq
         }
 
-        const updatedProfiles = [...profiles.filter(p => p.processName !== selectedProcess), newProfile]
-        setProfiles(updatedProfiles)
-        await saveSetting('profiles', updatedProfiles)
+        // Optimistic UI update (optional, but good for feedback)
+        // But we rely on config saving.
+
+        const config = await getConfig();
+        config.automation.profiles[selectedProcess] = { width: w, height: h, frequency: freq };
+
+        // Also update local list state
+        const updatedList = [...profiles.filter(p => p.processName !== selectedProcess), newProfile];
+        setProfiles(updatedList);
+
+        await saveConfig(config)
 
         setSelectedProcess('')
         setResPickerValue(null)
     }
 
     const handleDeleteProfile = async (processName: string) => {
-        const updatedProfiles = profiles.filter(p => p.processName !== processName)
-        setProfiles(updatedProfiles)
-        await saveSetting('profiles', updatedProfiles)
+        const config = await getConfig();
+        delete config.automation.profiles[processName];
+
+        const updatedList = profiles.filter(p => p.processName !== processName);
+        setProfiles(updatedList);
+
+        await saveConfig(config)
     }
 
     const handleDragEnd = async (event: DragEndEvent) => {
@@ -152,33 +170,27 @@ function ProfilesTab() {
             setProfiles((items) => {
                 const oldIndex = items.findIndex((item) => item.processName === active.id)
                 const newIndex = items.findIndex((item) => item.processName === over?.id)
-                const newOrder = arrayMove(items, oldIndex, newIndex)
-
-                // Save immediately
-                saveSetting('profiles', newOrder)
-                return newOrder
+                return arrayMove(items, oldIndex, newIndex)
             })
+            // Note: Saving order is not supported in the current 'Record<string, ...>' schema as maps differ in order implementation.
+            // If order matters, we need an array. User asked for specific schema which uses key-value.
+            // So we can assume order doesn't matter for the backend, only for UI convenience.
+            // We won't save the reorder to disk unless we change schema to array or ordered map.
         }
     }
 
     const handleDefaultProfileChange = async (val: { resolution: string; refreshRate: string } | null) => {
         setDefaultProfileValue(val)
-        const settings = await getSettings()
+        const config = await getConfig()
 
         if (val) {
             const [w, h] = val.resolution.split('x').map(Number)
             const freq = parseInt(val.refreshRate)
-            await saveSetting('automation', {
-                ...settings.automation,
-                defaultProfile: { width: w, height: h, frequency: freq }
-            })
+            config.automation.defaultProfile = { width: w, height: h, frequency: freq };
         } else {
-            // Handle clearing default profile if needed, though usually valid selection is enforced or we can allow nullable
-            await saveSetting('automation', {
-                ...settings.automation,
-                defaultProfile: undefined
-            })
+            config.automation.defaultProfile = undefined;
         }
+        await saveConfig(config)
     }
 
     return (

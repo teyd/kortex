@@ -125,27 +125,15 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
         }
     };
 
-    // Custom Store Path Resolution (Local to Executable)
-    let store_path = std::env::current_exe()
-        .unwrap_or_default()
-        .parent()
-        .unwrap_or_else(|| std::path::Path::new("."))
-        .join("config.json");
+    // Load Config via Manager (Portable)
+    let config = crate::config_manager::get_config(app_handle.clone());
+    let profiles = config.automation.profiles; // HashMap<String, Resolution>
 
-    let stores = app_handle.store(store_path);
-    let profiles: Vec<ResolutionProfile> = if let Ok(store) = stores {
-        if let Some(value) = store.get("automation") {
-            if let Some(profiles) = value.get("profiles") {
-                serde_json::from_value(profiles.clone()).unwrap_or_default()
-            } else {
-                Vec::new()
-            }
-        } else {
-            Vec::new()
-        }
-    } else {
-        Vec::new()
-    };
+    // We need to iterate the hashmap.
+    // Since we originally iterated a Vec and checked for name equality,
+    // here matches are keys. We can just lookup?
+    // Wait, users process names might be case insensitive or exact.
+    // Let's iterate keys to find case-insensitive match.
 
     let state_arc = {
         let guard = STATE.lock().unwrap();
@@ -164,27 +152,27 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
         );
 
         // Check for match
-        let mut matched_profile: Option<ResolutionProfile> = None;
-        for profile in profiles {
-            log::info!("  -> Checking profile: '{}'", profile.process_name);
-            if process_name.eq_ignore_ascii_case(&profile.process_name) {
-                matched_profile = Some(profile);
+        let mut matched_profile: Option<(String, Resolution)> = None;
+        for (proc_name, res) in profiles {
+            log::info!("  -> Checking profile: '{}'", proc_name);
+            if process_name.eq_ignore_ascii_case(&proc_name) {
+                matched_profile = Some((proc_name, res));
                 break;
             }
         }
 
-        if let Some(profile) = matched_profile {
+        if let Some((profile_name, profile_res)) = matched_profile {
             // We are inside a target process
             // 1. Cancel any pending revert
             let was_revert_pending = state.revert_pending.is_some();
             state.revert_pending = None;
 
-            if state.active_process.as_deref() != Some(&profile.process_name) {
+            if state.active_process.as_deref() != Some(&profile_name) {
                 // Different process matched - change resolution
                 log::info!(
                     "[{}] MATCH! Changing resolution for: {}",
                     source,
-                    profile.process_name
+                    profile_name
                 );
 
                 if state.original_resolution.is_none() {
@@ -199,21 +187,17 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
                     }
                 }
 
-                let target_res = Resolution {
-                    width: profile.width,
-                    height: profile.height,
-                    frequency: profile.frequency,
-                };
+                let target_res = profile_res.clone();
 
                 if let Err(e) = change_resolution(target_res) {
                     log::error!("Failed to set resolution: {}", e);
                 } else {
-                    state.active_process = Some(profile.process_name.clone());
+                    state.active_process = Some(profile_name.clone());
                     log::info!("Resolution Set!");
 
                     let _ = app_handle.emit("resolution-changed", serde_json::json!({
-                        "process": profile.process_name,
-                        "resolution": format!("{}x{}@{}Hz", profile.width, profile.height, profile.frequency),
+                        "process": profile_name,
+                        "resolution": format!("{}x{}@{}Hz", profile_res.width, profile_res.height, profile_res.frequency),
                         "status": "changed"
                     }));
                 }
@@ -222,11 +206,11 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
                 log::info!(
                     "[{}] Re-entered {}. Cancelled pending revert.",
                     source,
-                    profile.process_name
+                    profile_name
                 );
                 let _ = app_handle.emit("resolution-changed", serde_json::json!({
-                    "process": profile.process_name,
-                    "resolution": format!("{}x{}@{}Hz", profile.width, profile.height, profile.frequency),
+                    "process": profile_name,
+                    "resolution": format!("{}x{}@{}Hz", profile_res.width, profile_res.height, profile_res.frequency),
                     "status": "changed"
                 }));
             }
@@ -310,33 +294,10 @@ pub fn start_monitor_hook(app: AppHandle) {
                 let mut state = state_arc.lock().unwrap();
 
                 if let Some(pending_time) = state.revert_pending {
-                    // Check config for delay and default profile
-                    // Custom Store Path Resolution (Local to Executable)
-                    let store_path = std::env::current_exe()
-                        .unwrap_or_default()
-                        .parent()
-                        .unwrap_or_else(|| std::path::Path::new("."))
-                        .join("config.json");
-
-                    let (delay_ms, default_profile) =
-                        if let Ok(store) = app_handle_thread.store(store_path) {
-                            if let Some(val) = store.get("automation") {
-                                let delay = val
-                                    .get("revertDelay")
-                                    .and_then(|v| v.as_u64())
-                                    .unwrap_or(15000);
-
-                                let def_prof: Option<Resolution> = val
-                                    .get("defaultProfile")
-                                    .and_then(|v| serde_json::from_value(v.clone()).ok());
-
-                                (delay, def_prof)
-                            } else {
-                                (15000, None)
-                            }
-                        } else {
-                            (15000, None)
-                        };
+                    // Check config
+                    let config = crate::config_manager::get_config(app_handle_thread.clone());
+                    let delay_ms = config.automation.revert_delay;
+                    let default_profile = config.automation.default_profile;
 
                     if pending_time.elapsed() > Duration::from_millis(delay_ms) {
                         if let Some(active) = &state.active_process {

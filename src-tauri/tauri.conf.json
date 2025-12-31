@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "dynres",
   "version": "0.4.1",
-  "identifier": "com.github.teyd.dynres",
+  "identifier": "dynres",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
