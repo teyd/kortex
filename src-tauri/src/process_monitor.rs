@@ -165,9 +165,11 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
         if let Some(profile) = matched_profile {
             // We are inside a target process
             // 1. Cancel any pending revert
+            let was_revert_pending = state.revert_pending.is_some();
             state.revert_pending = None;
 
             if state.active_process.as_deref() != Some(&profile.process_name) {
+                // Different process matched - change resolution
                 log::info!(
                     "[{}] MATCH! Changing resolution for: {}",
                     source,
@@ -199,11 +201,23 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
                     log::info!("Resolution Set!");
 
                     let _ = app_handle.emit("resolution-changed", serde_json::json!({
+                        "process": profile.process_name,
+                        "resolution": format!("{}x{}@{}Hz", profile.width, profile.height, profile.frequency),
+                        "status": "changed"
+                    }));
+                }
+            } else if was_revert_pending {
+                // Same process - but we just cancelled a pending revert
+                log::info!(
+                    "[{}] Re-entered {}. Cancelled pending revert.",
+                    source,
+                    profile.process_name
+                );
+                let _ = app_handle.emit("resolution-changed", serde_json::json!({
                     "process": profile.process_name,
                     "resolution": format!("{}x{}@{}Hz", profile.width, profile.height, profile.frequency),
                     "status": "changed"
                 }));
-                }
             }
         } else {
             // We are NOT in a target process
