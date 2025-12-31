@@ -42,9 +42,18 @@ fn open_config_folder(app: tauri::AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    use tauri::menu::{Menu, MenuItem};
+    use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
+
     tauri::Builder::default()
         .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                window.hide().unwrap();
+                api.prevent_close();
+            }
+        })
         .setup(|app| {
             if cfg!(debug_assertions) {
                 let _ = app.handle().plugin(
@@ -59,8 +68,9 @@ pub fn run() {
             match stores {
                 Ok(store) => {
                     // tauri-plugin-store in Rust loads from disk.
-                    if let Some(val) = store.get("startMinimized") {
-                        if let Some(true) = val.as_bool() {
+                    // Schema is now: { "system": { "startMinimized": boolean, ... }, ... }
+                    if let Some(system) = store.get("system") {
+                        if let Some(true) = system.get("startMinimized").and_then(|v| v.as_bool()) {
                             if let Some(window) = app.get_webview_window("main") {
                                 window.hide().unwrap();
                             }
@@ -69,6 +79,39 @@ pub fn run() {
                 }
                 Err(_) => {}
             }
+
+            // Tray Implementation
+            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let show_i = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
+
+            let _tray = TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .on_menu_event(|app, event| match event.id().as_ref() {
+                    "quit" => app.exit(0),
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            window.show().unwrap();
+                            window.set_focus().unwrap();
+                        }
+                    }
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        ..
+                    } = event
+                    {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
 
             start_monitor_hook(app.handle().clone());
             Ok(())
