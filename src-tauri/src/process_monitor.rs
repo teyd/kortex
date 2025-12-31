@@ -125,10 +125,21 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
         }
     };
 
-    let stores = app_handle.store("config.json");
+    // Custom Store Path Resolution (Local to Executable)
+    let store_path = std::env::current_exe()
+        .unwrap_or_default()
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."))
+        .join("config.json");
+
+    let stores = app_handle.store(store_path);
     let profiles: Vec<ResolutionProfile> = if let Ok(store) = stores {
-        if let Some(value) = store.get("profiles") {
-            serde_json::from_value(value.clone()).unwrap_or_default()
+        if let Some(value) = store.get("automation") {
+            if let Some(profiles) = value.get("profiles") {
+                serde_json::from_value(profiles.clone()).unwrap_or_default()
+            } else {
+                Vec::new()
+            }
         } else {
             Vec::new()
         }
@@ -300,8 +311,15 @@ pub fn start_monitor_hook(app: AppHandle) {
 
                 if let Some(pending_time) = state.revert_pending {
                     // Check config for delay and default profile
+                    // Custom Store Path Resolution (Local to Executable)
+                    let store_path = std::env::current_exe()
+                        .unwrap_or_default()
+                        .parent()
+                        .unwrap_or_else(|| std::path::Path::new("."))
+                        .join("config.json");
+
                     let (delay_ms, default_profile) =
-                        if let Ok(store) = app_handle_thread.store("config.json") {
+                        if let Ok(store) = app_handle_thread.store(store_path) {
                             if let Some(val) = store.get("automation") {
                                 let delay = val
                                     .get("revertDelay")

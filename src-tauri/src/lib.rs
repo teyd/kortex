@@ -46,8 +46,14 @@ pub fn run() {
     use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            let _ = app
+                .get_webview_window("main")
+                .expect("no main window")
+                .set_focus();
+        }))
         .plugin(tauri_plugin_autostart::Builder::new().build())
-        .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_store::Builder::default().build())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 window.hide().unwrap();
@@ -63,9 +69,16 @@ pub fn run() {
                 );
             }
 
-            // Start Minimized Check
-            let stores = app.handle().store("config.json");
-            match stores {
+            // Custom Store Initialization (Local to Executable)
+            let store_path = std::env::current_exe()
+                .unwrap_or_default()
+                .parent()
+                .unwrap_or_else(|| std::path::Path::new("."))
+                .join("config.json");
+
+            let store = app.handle().store(store_path.clone());
+
+            match store {
                 Ok(store) => {
                     // tauri-plugin-store in Rust loads from disk.
                     // Schema is now: { "system": { "startMinimized": boolean, ... }, ... }
