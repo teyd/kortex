@@ -23,8 +23,6 @@ pub struct ProcessInfo {
     pub memory: u64,
 }
 
-// ResolutionProfile removed (dead code)
-
 // Global state for key monitoring data
 struct MonitorState {
     original_resolution: Option<Resolution>,
@@ -67,7 +65,6 @@ unsafe extern "system" fn win_event_hook(
     _dw_ms_event_time: u32,
 ) {
     if event == EVENT_SYSTEM_FOREGROUND {
-        // println!("Hook Triggered");
         check_and_apply_window(hwnd, "Hook");
     }
 }
@@ -97,7 +94,6 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
         proc.name().to_string_lossy().into_owned()
     } else {
         // This often happens for "System" processes or higher privilege if we can't read them.
-        // println!("[{}] Unknown PID: {}", source, process_id);
         return;
     };
 
