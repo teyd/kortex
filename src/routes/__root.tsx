@@ -86,6 +86,14 @@ function RootComponent() {
                             <Gamepad2 className="mr-2 h-4 w-4" />
                             Manual
                         </Link>
+                        <Link
+                            to="/mouse-lock"
+                            className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "justify-start")}
+                            activeProps={{ className: "bg-muted" }}
+                        >
+                            <Gamepad2 className="mr-2 h-4 w-4" />
+                            Mouse Lock
+                        </Link>
                     </nav>
 
                     <ResolutionIndicator />

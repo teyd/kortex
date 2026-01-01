@@ -6,12 +6,13 @@ use sysinfo::{Pid, ProcessesToUpdate, System};
 use tauri::AppHandle;
 use tauri::Emitter;
 use windows::Win32::{
-    Foundation::HWND,
+    Foundation::{HWND, RECT},
     UI::{
         Accessibility::{SetWinEventHook, HWINEVENTHOOK},
+        // Input::KeyboardAndMouse::ClipCursor,
         WindowsAndMessaging::{
-            DispatchMessageW, GetMessageW, GetWindowThreadProcessId, TranslateMessage,
-            EVENT_SYSTEM_FOREGROUND, MSG, WINEVENT_OUTOFCONTEXT,
+            ClipCursor, DispatchMessageW, GetMessageW, GetWindowRect, GetWindowThreadProcessId,
+            TranslateMessage, EVENT_SYSTEM_FOREGROUND, MSG, WINEVENT_OUTOFCONTEXT,
         },
     },
 };
@@ -28,6 +29,7 @@ struct MonitorState {
     original_resolution: Option<Resolution>,
     active_process: Option<String>, // Name of the process forcing the resolution
     revert_pending: Option<Instant>, // Time when revert was requested
+    locked_window: Option<usize>,
 }
 
 // Global AppHandle for the hook callback
@@ -116,6 +118,7 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
     // Load Config via Manager (Portable)
     let config = crate::config_manager::get_config(app_handle.clone());
     let profiles = config.automation.profiles; // HashMap<String, Resolution>
+    let mouse_lock_list = config.automation.mouse_lock;
 
     // We need to iterate the hashmap.
     // Since we originally iterated a Vec and checked for name equality,
@@ -142,13 +145,41 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
         // Check for match
         let mut matched_profile: Option<(String, Resolution)> = None;
 
-        // Prepare process name variants for matching
+        // Check for Mouse Lock
+        let mut should_lock_mouse = false;
         let proc_lower = process_name.to_lowercase();
         let proc_stem = std::path::Path::new(&process_name)
             .file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or(&process_name)
             .to_lowercase();
+
+        for lock_target in &mouse_lock_list {
+            let target_lower = lock_target.to_lowercase();
+            if proc_lower == target_lower || proc_stem == target_lower {
+                should_lock_mouse = true;
+                break;
+            }
+        }
+
+        if should_lock_mouse {
+            log::info!("[{}] Locking mouse to: {}", source, process_name);
+            unsafe {
+                let mut rect = RECT::default();
+                if GetWindowRect(hwnd, &mut rect).is_ok() {
+                    let _ = ClipCursor(Some(&rect));
+                    state.locked_window = Some(hwnd.0 as usize);
+                }
+            }
+        } else {
+            // Unlock if not a target (or if we switched to a non-target)
+            // Only unlock if we actually switched windows (which we did if we are here)
+            // Note: It's safe to call ClipCursor(None) repeatedly.
+            unsafe {
+                let _ = ClipCursor(None);
+            }
+            state.locked_window = None;
+        }
 
         // Optimized lookup: Iterate once checking both exact and stem matches
         for (key, res) in profiles {
@@ -253,6 +284,7 @@ pub fn start_monitor_hook(app: AppHandle) {
             original_resolution: None,
             active_process: None,
             revert_pending: None,
+            locked_window: None,
         })));
     }
 
@@ -342,6 +374,36 @@ pub fn start_monitor_hook(app: AppHandle) {
                             state.original_resolution = None;
                         }
                         state.revert_pending = None;
+                    }
+                }
+            }
+        }
+    });
+
+    // Thread 3: Mouse Lock Enforcement (High Frequency)
+    std::thread::spawn(move || {
+        println!("Starting Mouse Lock Watcher Thread...");
+        loop {
+            std::thread::sleep(Duration::from_millis(20));
+
+            let state_arc = {
+                let guard = STATE.lock().unwrap();
+                guard.clone()
+            };
+
+            if let Some(state_arc) = state_arc {
+                let target_hwnd = {
+                    let state = state_arc.lock().unwrap();
+                    state.locked_window
+                };
+
+                if let Some(hwnd_val) = target_hwnd {
+                    let hwnd = HWND(hwnd_val as *mut _);
+                    unsafe {
+                        let mut rect = RECT::default();
+                        if GetWindowRect(hwnd, &mut rect).is_ok() {
+                            let _ = ClipCursor(Some(&rect));
+                        }
                     }
                 }
             }

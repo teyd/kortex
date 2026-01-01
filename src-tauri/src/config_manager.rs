@@ -26,6 +26,8 @@ pub struct AutomationConfig {
     pub revert_delay: u64,
     #[serde(rename = "defaultProfile")]
     pub default_profile: Option<Resolution>,
+    #[serde(rename = "mouseLock")]
+    pub mouse_lock: Vec<String>,
     pub profiles: HashMap<String, Resolution>,
 }
 
@@ -49,6 +51,7 @@ impl Default for AppConfig {
             automation: AutomationConfig {
                 revert_delay: 15000,
                 default_profile: None,
+                mouse_lock: Vec::new(),
                 profiles: HashMap::new(),
             },
         }

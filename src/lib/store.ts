@@ -19,6 +19,7 @@ export interface Config {
     automation: {
         revertDelay: number;
         defaultProfile?: Resolution;
+        mouseLock: string[];
         profiles: Record<string, Resolution>;
     };
 }

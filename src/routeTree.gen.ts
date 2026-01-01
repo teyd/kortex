@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ProfilesRouteImport } from './routes/profiles'
+import { Route as MouseLockRouteImport } from './routes/mouse-lock'
 import { Route as ManualRouteImport } from './routes/manual'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -22,6 +23,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const ProfilesRoute = ProfilesRouteImport.update({
   id: '/profiles',
   path: '/profiles',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MouseLockRoute = MouseLockRouteImport.update({
+  id: '/mouse-lock',
+  path: '/mouse-lock',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ManualRoute = ManualRouteImport.update({
@@ -38,12 +44,14 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/manual': typeof ManualRoute
+  '/mouse-lock': typeof MouseLockRoute
   '/profiles': typeof ProfilesRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/manual': typeof ManualRoute
+  '/mouse-lock': typeof MouseLockRoute
   '/profiles': typeof ProfilesRoute
   '/settings': typeof SettingsRoute
 }
@@ -51,20 +59,22 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/manual': typeof ManualRoute
+  '/mouse-lock': typeof MouseLockRoute
   '/profiles': typeof ProfilesRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/manual' | '/profiles' | '/settings'
+  fullPaths: '/' | '/manual' | '/mouse-lock' | '/profiles' | '/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/manual' | '/profiles' | '/settings'
-  id: '__root__' | '/' | '/manual' | '/profiles' | '/settings'
+  to: '/' | '/manual' | '/mouse-lock' | '/profiles' | '/settings'
+  id: '__root__' | '/' | '/manual' | '/mouse-lock' | '/profiles' | '/settings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ManualRoute: typeof ManualRoute
+  MouseLockRoute: typeof MouseLockRoute
   ProfilesRoute: typeof ProfilesRoute
   SettingsRoute: typeof SettingsRoute
 }
@@ -83,6 +93,13 @@ declare module '@tanstack/react-router' {
       path: '/profiles'
       fullPath: '/profiles'
       preLoaderRoute: typeof ProfilesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mouse-lock': {
+      id: '/mouse-lock'
+      path: '/mouse-lock'
+      fullPath: '/mouse-lock'
+      preLoaderRoute: typeof MouseLockRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/manual': {
@@ -105,6 +122,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ManualRoute: ManualRoute,
+  MouseLockRoute: MouseLockRoute,
   ProfilesRoute: ProfilesRoute,
   SettingsRoute: SettingsRoute,
 }
