@@ -14,14 +14,17 @@ When a recognized process (e.g., a specific game EXE) becomes the active window,
 
 ## Screenshots
 
-![Profiles](https://i.nuuls.com/dK603.png)
+![Res](https://i.nuuls.com/uv_fI.png)
 *Manage resolution profiles for your games.*
 
-![Settings](https://i.nuuls.com/fRf-r.png)
-*Configure settings and automation behavior.*
+![Mouse Lock](https://i.nuuls.com/qcstH.png)
+*Configure mouse lock behavior.*
 
-![Manual](https://i.nuuls.com/QUOaM.png)
+![Manual](https://i.nuuls.com/_PUcI.png)
 *Manual resolution change.*
+
+![Settings](https://i.nuuls.com/zwc57.png)
+*Basic settings.*
 
 ## Build Yourself
 
