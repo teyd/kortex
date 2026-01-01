@@ -29,14 +29,37 @@ pub struct MouseLockConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AutomationConfig {
-    #[serde(rename = "revertDelay")]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileConfig {
+    pub process: String,
+    pub width: u32,
+    pub height: u32,
+    pub frequency: u32,
+}
+
+impl From<ProfileConfig> for Resolution {
+    fn from(val: ProfileConfig) -> Self {
+        Resolution {
+            width: val.width,
+            height: val.height,
+            frequency: val.frequency,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoResConfig {
     pub revert_delay: u64,
-    #[serde(rename = "defaultProfile")]
     pub default_profile: Option<Resolution>,
-    #[serde(rename = "mouseLock")]
+    pub profiles: Vec<ProfileConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationConfig {
     pub mouse_lock: Vec<MouseLockConfig>,
-    pub profiles: HashMap<String, Resolution>,
+    pub auto_res: AutoResConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,10 +80,12 @@ impl Default for AppConfig {
                 start_minimized: false,
             },
             automation: AutomationConfig {
-                revert_delay: 15000,
-                default_profile: None,
                 mouse_lock: Vec::new(),
-                profiles: HashMap::new(),
+                auto_res: AutoResConfig {
+                    revert_delay: 15000,
+                    default_profile: None,
+                    profiles: Vec::new(),
+                },
             },
         }
     }

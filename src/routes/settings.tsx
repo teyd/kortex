@@ -33,7 +33,7 @@ function SettingsTab() {
         // Load settings
         getConfig().then(c => {
             setStartMinimized(c.system.startMinimized)
-            const ms = c.automation.revertDelay
+            const ms = c.automation.autoRes.revertDelay
 
             // Set initial unit/value representation
             if (ms % 60000 === 0 && ms !== 0) {
@@ -89,7 +89,7 @@ function SettingsTab() {
         setUnit(newUnit)
 
         const config = await getConfig();
-        config.automation.revertDelay = totalMs;
+        config.automation.autoRes.revertDelay = totalMs;
         await saveConfig(config);
     }
 

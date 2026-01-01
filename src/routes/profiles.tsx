@@ -95,16 +95,18 @@ function ProfilesTab() {
         try {
             const config = await getConfig()
 
-            // Convert Record -> Array for sorting/display
-            const profileList: ResolutionProfile[] = Object.entries(config.automation.profiles).map(([name, res]) => ({
-                processName: name,
-                ...res
-            }));
+            // Already an array now
+            const profileList: ResolutionProfile[] = config.automation.autoRes.profiles.map(p => ({
+                processName: p.process, // Mapped from process -> processName for local usage
+                width: p.width,
+                height: p.height,
+                frequency: p.frequency
+            }))
 
             setProfiles(profileList)
 
-            if (config.automation.defaultProfile) {
-                const def = config.automation.defaultProfile
+            if (config.automation.autoRes.defaultProfile) {
+                const def = config.automation.autoRes.defaultProfile
                 setDefaultProfileValue({
                     resolution: `${def.width}x${def.height}`,
                     refreshRate: def.frequency.toString()
@@ -145,17 +147,20 @@ function ProfilesTab() {
             frequency: freq
         }
 
-        // Optimistic UI update (optional, but good for feedback)
-        // But we rely on config saving.
-
         const config = await getConfig();
-        config.automation.profiles[selectedProcess] = { width: w, height: h, frequency: freq };
+        // Check if exists, replace or add
+        const existingIdx = config.automation.autoRes.profiles.findIndex(p => p.process === selectedProcess);
+        const newEntry = { process: selectedProcess, width: w, height: h, frequency: freq };
 
-        // Also update local list state
-        const updatedList = [...profiles.filter(p => p.processName !== selectedProcess), newProfile];
-        setProfiles(updatedList);
+        if (existingIdx >= 0) {
+            config.automation.autoRes.profiles[existingIdx] = newEntry;
+        } else {
+            config.automation.autoRes.profiles.push(newEntry);
+        }
 
         await saveConfig(config)
+        // Reload to sync state exactly
+        await loadData(); // Simplified state sync
 
         setSelectedProcess('')
         setResPickerValue(null)
@@ -163,12 +168,10 @@ function ProfilesTab() {
 
     const handleDeleteProfile = async (processName: string) => {
         const config = await getConfig();
-        delete config.automation.profiles[processName];
-
-        const updatedList = profiles.filter(p => p.processName !== processName);
-        setProfiles(updatedList);
-
+        config.automation.autoRes.profiles = config.automation.autoRes.profiles.filter(p => p.process !== processName);
         await saveConfig(config)
+
+        await loadData();
     }
 
     const handleDragEnd = async (event: DragEndEvent) => {
@@ -178,12 +181,24 @@ function ProfilesTab() {
             setProfiles((items) => {
                 const oldIndex = items.findIndex((item) => item.processName === active.id)
                 const newIndex = items.findIndex((item) => item.processName === over?.id)
-                return arrayMove(items, oldIndex, newIndex)
+                const newItems = arrayMove(items, oldIndex, newIndex)
+
+                // Persist new order!
+                // We need to map back to config structure
+                const saveOrder = async () => {
+                    const config = await getConfig();
+                    config.automation.autoRes.profiles = newItems.map(p => ({
+                        process: p.processName,
+                        width: p.width,
+                        height: p.height,
+                        frequency: p.frequency
+                    }));
+                    await saveConfig(config);
+                };
+                saveOrder();
+
+                return newItems
             })
-            // Note: Saving order is not supported in the current 'Record<string, ...>' schema as maps differ in order implementation.
-            // If order matters, we need an array. User asked for specific schema which uses key-value.
-            // So we can assume order doesn't matter for the backend, only for UI convenience.
-            // We won't save the reorder to disk unless we change schema to array or ordered map.
         }
     }
 
@@ -194,9 +209,9 @@ function ProfilesTab() {
         if (val) {
             const [w, h] = val.resolution.split('x').map(Number)
             const freq = parseInt(val.refreshRate)
-            config.automation.defaultProfile = { width: w, height: h, frequency: freq };
+            config.automation.autoRes.defaultProfile = { width: w, height: h, frequency: freq };
         } else {
-            config.automation.defaultProfile = undefined;
+            config.automation.autoRes.defaultProfile = undefined;
         }
         await saveConfig(config)
     }

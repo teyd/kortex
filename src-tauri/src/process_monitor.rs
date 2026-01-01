@@ -83,20 +83,12 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
         GetWindowThreadProcessId(hwnd, Some(&mut process_id));
     }
 
-    // Optimization: avoid re-creating System every millisecond if possible,
-    // but for now creating it fresh ensures we get the latest proc list safely.
-    // To optimize, we could store a System in a Mutex, but `System::new_all()` is actually heavy.
-    // `System::new()` is lighter.
     let mut sys = System::new();
-    // We only need to refresh specific PID?
-    // sysinfo 0.36 doesn't have refresh_process(pid) directly on System easily without Full refresh sometimes?
-    // Actually, refresh_processes with list is best.
     sys.refresh_processes(ProcessesToUpdate::All, true);
 
     let process_name = if let Some(proc) = sys.process(Pid::from_u32(process_id)) {
         proc.name().to_string_lossy().into_owned()
     } else {
-        // This often happens for "System" processes or higher privilege if we can't read them.
         return;
     };
 
@@ -107,7 +99,6 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
         process_id
     );
 
-    // Access Global State
     let app_handle = unsafe {
         if let Some(ref h) = APP_HANDLE {
             h.clone()
@@ -116,16 +107,10 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
         }
     };
 
-    // Load Config via Manager (Portable)
+    // Load Config
     let config = crate::config_manager::get_config(app_handle.clone());
-    let profiles = config.automation.profiles; // HashMap<String, Resolution>
+    let profiles = config.automation.auto_res.profiles; // Vec<ProfileConfig>
     let mouse_lock_list = config.automation.mouse_lock;
-
-    // We need to iterate the hashmap.
-    // Since we originally iterated a Vec and checked for name equality,
-    // here matches are keys. We can just lookup?
-    // Wait, users process names might be case insensitive or exact.
-    // Let's iterate keys to find case-insensitive match.
 
     let state_arc = {
         let guard = STATE.lock().unwrap();
@@ -134,17 +119,6 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
 
     if let Some(state_arc) = state_arc {
         let mut state = state_arc.lock().unwrap();
-
-        // Debug logging for rules
-        log::info!(
-            "[{}] Checking {} profiles against process '{}'",
-            source,
-            profiles.len(),
-            process_name
-        );
-
-        // Check for match
-        let mut matched_profile: Option<(String, Resolution)> = None;
 
         // Check for Mouse Lock
         let mut should_lock_mouse = false;
@@ -186,40 +160,38 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
                 }
             }
         } else {
-            // Unlock if not a target (or if we switched to a non-target)
-            // Only unlock if we actually switched windows (which we did if we are here)
-            // Note: It's safe to call ClipCursor(None) repeatedly.
             unsafe {
                 let _ = ClipCursor(None);
             }
             state.locked_window = None;
         }
 
-        // Optimized lookup: Iterate once checking both exact and stem matches
-        for (key, res) in profiles {
+        // Check for Resolution Profile
+        let mut matched_profile: Option<(String, Resolution)> = None;
+
+        for profile in profiles {
+            let key = profile.process.clone();
             let key_lower = key.to_lowercase();
 
-            // 1. Exact Match (Case-Insensitive) | e.g. "cs2.exe" == "CS2.EXE"
+            // 1. Exact Match
             if proc_lower == key_lower {
-                matched_profile = Some((key, res));
+                matched_profile = Some((key, profile.into()));
                 break;
             }
 
-            // 2. Stem Match (Case-Insensitive) | e.g. "cs2.exe" (stem: cs2) == "CS2"
+            // 2. Stem Match
             if proc_stem == key_lower {
-                matched_profile = Some((key, res));
+                matched_profile = Some((key, profile.into()));
                 break;
             }
         }
 
         if let Some((profile_name, profile_res)) = matched_profile {
             // We are inside a target process
-            // 1. Cancel any pending revert
             let was_revert_pending = state.revert_pending.is_some();
             state.revert_pending = None;
 
             if state.active_process.as_deref() != Some(&profile_name) {
-                // Different process matched - change resolution
                 log::info!(
                     "[{}] MATCH! Changing resolution for: {}",
                     source,
@@ -229,23 +201,14 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
                 if state.original_resolution.is_none() {
                     if let Some(current) = get_current_resolution() {
                         state.original_resolution = Some(current.clone());
-                        log::info!(
-                            "Saved original: {}x{}@{}",
-                            current.width,
-                            current.height,
-                            current.frequency
-                        );
                     }
                 }
 
-                let target_res = profile_res.clone();
-
-                if let Err(e) = change_resolution(target_res) {
+                if let Err(e) = change_resolution(profile_res.clone()) {
                     log::error!("Failed to set resolution: {}", e);
                 } else {
                     state.active_process = Some(profile_name.clone());
                     log::info!("Resolution Set!");
-
                     let _ = app_handle.emit("resolution-changed", serde_json::json!({
                         "process": profile_name,
                         "resolution": format!("{}x{}@{}Hz", profile_res.width, profile_res.height, profile_res.frequency),
@@ -253,7 +216,6 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
                     }));
                 }
             } else if was_revert_pending {
-                // Same process - but we just cancelled a pending revert
                 log::info!(
                     "[{}] Re-entered {}. Cancelled pending revert.",
                     source,
@@ -266,18 +228,16 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
                 }));
             }
         } else {
-            // We are NOT in a target process
-            // If we have an active process, we might need to revert
+            // Not a target process
             if let Some(active) = &state.active_process {
                 if state.revert_pending.is_none() {
                     let active_name = active.clone();
                     log::info!(
-                        "[{}] Lost focus of {}. Starting revert timer (15s).",
+                        "[{}] Lost focus of {}. Starting revert timer.",
                         source,
                         active_name
                     );
                     state.revert_pending = Some(Instant::now());
-
                     let _ = app_handle.emit(
                         "resolution-changed",
                         serde_json::json!({
@@ -303,7 +263,7 @@ pub fn start_monitor_hook(app: AppHandle) {
         })));
     }
 
-    // Thread 1: Windows Event Hook (Instant)
+    // Thread 1: Windows Event Hook
     std::thread::spawn(|| {
         println!("Starting Event Hook Thread...");
         unsafe {
@@ -330,14 +290,13 @@ pub fn start_monitor_hook(app: AppHandle) {
         }
     });
 
-    // Thread 2: Revert Timer Watcher (Checks every 1s)
+    // Thread 2: Revert Timer Watcher
     let app_handle_thread = app.clone();
     std::thread::spawn(move || {
         println!("Starting Revert Watcher Thread...");
         loop {
             std::thread::sleep(Duration::from_secs(1));
 
-            // Check if we need to revert
             let state_arc = {
                 let guard = STATE.lock().unwrap();
                 guard.clone()
@@ -347,19 +306,17 @@ pub fn start_monitor_hook(app: AppHandle) {
                 let mut state = state_arc.lock().unwrap();
 
                 if let Some(pending_time) = state.revert_pending {
-                    // Check config
                     let config = crate::config_manager::get_config(app_handle_thread.clone());
-                    let delay_ms = config.automation.revert_delay;
-                    let default_profile = config.automation.default_profile;
+                    let delay_ms = config.automation.auto_res.revert_delay;
+                    let default_profile = config.automation.auto_res.default_profile;
 
                     if pending_time.elapsed() > Duration::from_millis(delay_ms) {
                         if let Some(active) = &state.active_process {
                             log::info!("Revert timer expired for {}. Reverting now.", active);
 
-                            // Prioritize Default Profile, then Original Resolution
                             let target = if let Some(def) = default_profile {
                                 log::info!(
-                                    "Using Default Profile resolution: {}x{}@{}",
+                                    "Using Default Profile: {}x{}@{}",
                                     def.width,
                                     def.height,
                                     def.frequency
@@ -376,13 +333,11 @@ pub fn start_monitor_hook(app: AppHandle) {
                                     log::info!("Reverted successfully.");
                                     let _ = app_handle_thread.emit(
                                         "resolution-changed",
-                                        serde_json::json!({
-                                                "status": "reverted"
-                                        }),
+                                        serde_json::json!({ "status": "reverted" }),
                                     );
                                 }
                             } else {
-                                log::warn!("No resolution to revert to (no Default Profile and no Original saved).");
+                                log::warn!("No resolution to revert to.");
                             }
 
                             state.active_process = None;

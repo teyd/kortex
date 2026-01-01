@@ -33,16 +33,9 @@ function MouseLockTab() {
     const loadData = async () => {
         try {
             const config = await getConfig()
-            // Ensure array exists (backward compatibility)
+            // Ensure array exists
             const list = config.automation.mouseLock || []
-            // Migrate old string[] to object[] if needed
-            const migratedList: MouseLockItem[] = list.map((item: any) => {
-                if (typeof item === 'string') {
-                    return { process: item, paddingX: 0, paddingY: 0 }
-                }
-                return item
-            })
-            setMouseLockList(migratedList)
+            setMouseLockList(list)
 
             await refreshProcesses()
         } catch (e) {

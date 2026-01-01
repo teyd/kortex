@@ -2,27 +2,52 @@ import { invoke } from '@tauri-apps/api/core';
 
 export type Theme = "dark" | "light" | "system";
 
-export interface Resolution {
+export interface ResolutionProfile {
+    processName: string;
     width: number;
     height: number;
     frequency: number;
 }
 
-export interface Config {
+export interface MouseLockItem {
+    process: string;
+    paddingX: number;
+    paddingY: number;
+}
+
+export interface AutomationSettings {
+    mouseLock: MouseLockItem[];
+    autoRes: {
+        revertDelay: number;
+        defaultProfile?: { width: number, height: number, frequency: number };
+        profiles: { process: string; width: number; height: number; frequency: number }[];
+    };
+}
+
+export interface AppSettings {
     ui: {
-        theme: Theme;
+        theme: "light" | "dark" | "system";
     };
     system: {
         autostart: boolean;
         startMinimized: boolean;
     };
-    automation: {
-        revertDelay: number;
-        defaultProfile?: Resolution;
-        mouseLock: { process: string; paddingX: number; paddingY: number }[];
-        profiles: Record<string, Resolution>;
-    };
+    automation: AutomationSettings;
 }
+
+export const defaultSettings: AppSettings = {
+    ui: { theme: 'system' },
+    system: { autostart: false, startMinimized: false },
+    automation: {
+        mouseLock: [],
+        autoRes: {
+            revertDelay: 15000,
+            profiles: []
+        }
+    }
+}
+
+export interface Config extends AppSettings { }
 
 export async function getConfig(): Promise<Config> {
     return await invoke('get_config');
