@@ -21,13 +21,21 @@ pub struct SystemConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MouseLockConfig {
+    pub process: String,
+    pub padding_x: u32,
+    pub padding_y: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutomationConfig {
     #[serde(rename = "revertDelay")]
     pub revert_delay: u64,
     #[serde(rename = "defaultProfile")]
     pub default_profile: Option<Resolution>,
     #[serde(rename = "mouseLock")]
-    pub mouse_lock: Vec<String>,
+    pub mouse_lock: Vec<MouseLockConfig>,
     pub profiles: HashMap<String, Resolution>,
 }
 

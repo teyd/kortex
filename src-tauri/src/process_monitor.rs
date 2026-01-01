@@ -30,6 +30,7 @@ struct MonitorState {
     active_process: Option<String>, // Name of the process forcing the resolution
     revert_pending: Option<Instant>, // Time when revert was requested
     locked_window: Option<usize>,
+    locked_window_padding: (u32, u32),
 }
 
 // Global AppHandle for the hook callback
@@ -147,6 +148,7 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
 
         // Check for Mouse Lock
         let mut should_lock_mouse = false;
+        let mut padding = (0, 0);
         let proc_lower = process_name.to_lowercase();
         let proc_stem = std::path::Path::new(&process_name)
             .file_stem()
@@ -154,21 +156,33 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
             .unwrap_or(&process_name)
             .to_lowercase();
 
-        for lock_target in &mouse_lock_list {
-            let target_lower = lock_target.to_lowercase();
+        for lock_config in &mouse_lock_list {
+            let target_lower = lock_config.process.to_lowercase();
             if proc_lower == target_lower || proc_stem == target_lower {
                 should_lock_mouse = true;
+                padding = (lock_config.padding_x, lock_config.padding_y);
                 break;
             }
         }
 
         if should_lock_mouse {
-            log::info!("[{}] Locking mouse to: {}", source, process_name);
+            log::info!(
+                "[{}] Locking mouse to: {} (Padding: {}x{})",
+                source,
+                process_name,
+                padding.0,
+                padding.1
+            );
             unsafe {
                 let mut rect = RECT::default();
                 if GetWindowRect(hwnd, &mut rect).is_ok() {
+                    rect.left += padding.0 as i32;
+                    rect.top += padding.1 as i32;
+                    rect.right -= padding.0 as i32;
+                    rect.bottom -= padding.1 as i32;
                     let _ = ClipCursor(Some(&rect));
                     state.locked_window = Some(hwnd.0 as usize);
+                    state.locked_window_padding = padding;
                 }
             }
         } else {
@@ -285,6 +299,7 @@ pub fn start_monitor_hook(app: AppHandle) {
             active_process: None,
             revert_pending: None,
             locked_window: None,
+            locked_window_padding: (0, 0),
         })));
     }
 
@@ -392,9 +407,9 @@ pub fn start_monitor_hook(app: AppHandle) {
             };
 
             if let Some(state_arc) = state_arc {
-                let target_hwnd = {
+                let (target_hwnd, padding) = {
                     let state = state_arc.lock().unwrap();
-                    state.locked_window
+                    (state.locked_window, state.locked_window_padding)
                 };
 
                 if let Some(hwnd_val) = target_hwnd {
@@ -402,6 +417,10 @@ pub fn start_monitor_hook(app: AppHandle) {
                     unsafe {
                         let mut rect = RECT::default();
                         if GetWindowRect(hwnd, &mut rect).is_ok() {
+                            rect.left += padding.0 as i32;
+                            rect.top += padding.1 as i32;
+                            rect.right -= padding.0 as i32;
+                            rect.bottom -= padding.1 as i32;
                             let _ = ClipCursor(Some(&rect));
                         }
                     }
