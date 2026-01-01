@@ -2,7 +2,7 @@ import { createRootRoute, Link, Outlet } from '@tanstack/react-router'
 import { ThemeProvider } from '../components/theme-provider'
 import { buttonVariants } from '../components/ui/button'
 import { ScrollArea } from '../components/ui/scroll-area'
-import { List, Settings2, Gamepad2, Info } from 'lucide-react'
+import { Settings2, Info, Monitor, SlidersHorizontal, MousePointer2 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useEffect, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
@@ -63,12 +63,28 @@ function RootComponent() {
                 <header className="border-b bg-card p-2 flex items-center justify-between shrink-0">
                     <nav className="flex gap-2">
                         <Link
-                            to="/profiles"
+                            to="/res"
                             className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "justify-start")}
                             activeProps={{ className: "bg-muted" }}
                         >
-                            <List className="mr-2 h-4 w-4" />
-                            Profiles
+                            <Monitor className="mr-2 h-4 w-4" />
+                            Res
+                        </Link>
+                        <Link
+                            to="/mouse-lock"
+                            className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "justify-start")}
+                            activeProps={{ className: "bg-muted" }}
+                        >
+                            <MousePointer2 className="mr-2 h-4 w-4" />
+                            Mouse Lock
+                        </Link>
+                        <Link
+                            to="/manual"
+                            className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "justify-start")}
+                            activeProps={{ className: "bg-muted" }}
+                        >
+                            <SlidersHorizontal className="mr-2 h-4 w-4" />
+                            Manual
                         </Link>
                         <Link
                             to="/settings"
@@ -77,22 +93,6 @@ function RootComponent() {
                         >
                             <Settings2 className="mr-2 h-4 w-4" />
                             Settings
-                        </Link>
-                        <Link
-                            to="/manual"
-                            className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "justify-start")}
-                            activeProps={{ className: "bg-muted" }}
-                        >
-                            <Gamepad2 className="mr-2 h-4 w-4" />
-                            Manual
-                        </Link>
-                        <Link
-                            to="/mouse-lock"
-                            className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "justify-start")}
-                            activeProps={{ className: "bg-muted" }}
-                        >
-                            <Gamepad2 className="mr-2 h-4 w-4" />
-                            Mouse Lock
                         </Link>
                     </nav>
 

@@ -6,7 +6,7 @@ import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select'
 import { Label } from '../components/ui/label'
 import { Button } from '../components/ui/button'
-import { Input } from '../components/ui/input'
+// import { Input } from '../components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { FolderOpen } from 'lucide-react'
 
@@ -20,10 +20,6 @@ function SettingsTab() {
     const [startMinimized, setStartMinimized] = useState(false)
     const [version, setVersion] = useState("")
 
-    // Config state
-    const [inputValue, setInputValue] = useState(15)
-    const [unit, setUnit] = useState<"ms" | "s" | "m">("s")
-
     useEffect(() => {
         // Check autostart status
         isEnabled().then(setAutostartEnabled).catch(err => console.error("Autostart check failed:", err))
@@ -33,19 +29,6 @@ function SettingsTab() {
         // Load settings
         getConfig().then(c => {
             setStartMinimized(c.system.startMinimized)
-            const ms = c.automation.autoRes.revertDelay
-
-            // Set initial unit/value representation
-            if (ms % 60000 === 0 && ms !== 0) {
-                setUnit("m")
-                setInputValue(ms / 60000)
-            } else if (ms % 1000 === 0 && ms !== 0) {
-                setUnit("s")
-                setInputValue(ms / 1000)
-            } else {
-                setUnit("ms")
-                setInputValue(ms)
-            }
         })
     }, [])
 
@@ -79,32 +62,6 @@ function SettingsTab() {
         // Let's check provider implementation. Yes, provider calls saveConfig.
     }
 
-    const updateRevertDelay = async (val: number, newUnit: "ms" | "s" | "m") => {
-        let multiplier = 1
-        if (newUnit === 's') multiplier = 1000
-        if (newUnit === 'm') multiplier = 60000
-
-        const totalMs = val * multiplier
-        setInputValue(val)
-        setUnit(newUnit)
-
-        const config = await getConfig();
-        config.automation.autoRes.revertDelay = totalMs;
-        await saveConfig(config);
-    }
-
-    const handleValueChange = (valStr: string) => {
-        const val = parseFloat(valStr)
-        if (!isNaN(val) && val >= 0) {
-            updateRevertDelay(val, unit)
-        } else if (valStr === '') {
-            setInputValue(0)
-        }
-    }
-
-    const handleUnitChange = (newUnit: "ms" | "s" | "m") => {
-        updateRevertDelay(inputValue, newUnit)
-    }
 
     return (
         <div className="space-y-6">
@@ -172,41 +129,6 @@ function SettingsTab() {
                                 onChange={(e) => toggleStartMinimized(e.target.checked)}
                                 className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
                             />
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* Automation Section */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Automation</CardTitle>
-                    <CardDescription>Configure how resolution changes are handled.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label htmlFor="revertDelay" className="text-base">Revert Delay</Label>
-                            <p className="text-sm text-muted-foreground">Time to wait before reverting resolution.</p>
-                        </div>
-                        <div className="flex items-center gap-2 w-[220px]">
-                            <Input
-                                type="number"
-                                min="0"
-                                value={inputValue}
-                                onChange={(e) => handleValueChange(e.target.value)}
-                                className="w-[100px]"
-                            />
-                            <Select value={unit} onValueChange={(val: any) => handleUnitChange(val)}>
-                                <SelectTrigger className="w-[110px]">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="ms">Millis (ms)</SelectItem>
-                                    <SelectItem value="s">Seconds (s)</SelectItem>
-                                    <SelectItem value="m">Minutes (m)</SelectItem>
-                                </SelectContent>
-                            </Select>
                         </div>
                     </div>
                 </CardContent>

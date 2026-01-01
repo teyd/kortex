@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import { getConfig, saveConfig, fetchProcesses, getSupportedResolutions, type ResolutionProfile, type ProcessInfo, type Resolution } from '../lib/store'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+// import { Input } from '../components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 import { ProcessPicker } from '../components/process-picker'
 import { ResolutionPicker } from '../components/resolution-picker'
 import { Plus, Trash2, RefreshCw, GripVertical } from 'lucide-react'
@@ -24,7 +26,9 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
-export const Route = createFileRoute('/profiles')({
+import { Slider } from '../components/ui/slider'
+
+export const Route = createFileRoute('/res')({
     component: ProfilesTab,
 })
 
@@ -111,6 +115,16 @@ function ProfilesTab() {
                     resolution: `${def.width}x${def.height}`,
                     refreshRate: def.frequency.toString()
                 })
+            }
+
+            const ms = config.automation.autoRes.revertDelay || 15000
+            // Default behavior simplified: only support s/m for editing, but respect raw ms loading
+            if (ms >= 60000 && ms % 60000 === 0) {
+                setRevertUnit("m")
+                setRevertValue(ms / 60000)
+            } else {
+                setRevertUnit("s")
+                setRevertValue(Math.floor(ms / 1000))
             }
 
             await refreshProcesses()
@@ -209,6 +223,22 @@ function ProfilesTab() {
         await saveConfig(config)
     }
 
+    const [revertUnit, setRevertUnit] = useState<"s" | "m">("s")
+    const [revertValue, setRevertValue] = useState(0)
+
+    const updateRevertDelay = async (val: number, newUnit: "s" | "m") => {
+        let multiplier = 1000
+        if (newUnit === 'm') multiplier = 60000
+
+        const totalMs = val * multiplier
+        setRevertValue(val)
+        setRevertUnit(newUnit)
+
+        const config = await getConfig();
+        config.automation.autoRes.revertDelay = totalMs;
+        await saveConfig(config);
+    }
+
     return (
         <div className="space-y-6">
             <Card>
@@ -217,8 +247,6 @@ function ProfilesTab() {
                     <CardDescription>Select a running process to automate.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4 flex flex-col">
-
-
                     <ProcessPicker
                         processes={processes}
                         value={selectedProcess}
@@ -227,7 +255,6 @@ function ProfilesTab() {
                         placeholder="Select a process..."
                         className="h-10 text-sm"
                     />
-
                     <ResolutionPicker
                         resolutions={resolutions}
                         value={resPickerValue}
@@ -235,7 +262,6 @@ function ProfilesTab() {
                         placeholder="Select resolution..."
                         className="h-10 text-sm"
                     />
-
                     <Button onClick={handleAddProfile} disabled={!selectedProcess || !resPickerValue} className="w-[300px]">
                         <Plus className="mr-2 h-4 w-4" /> Add Profile
                     </Button>
@@ -305,6 +331,47 @@ function ProfilesTab() {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Revert Delay Section */}
+            <Card className="mt-6">
+                <CardHeader>
+                    <CardTitle>Revert Delay</CardTitle>
+                    <CardDescription>
+                        Time to wait after closing a game before reverting resolution.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex flex-col gap-4">
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-muted-foreground">
+                                Current Delay: <span className="text-foreground font-bold">{revertValue}</span> {revertUnit}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <Slider
+                                value={[revertValue]}
+                                min={0}
+                                max={60}
+                                step={1}
+                                onValueChange={(vals) => {
+                                    const val = Array.isArray(vals) ? vals[0] : vals;
+                                    updateRevertDelay(val, revertUnit)
+                                }}
+                                className="flex-1"
+                            />
+                            <Select value={revertUnit} onValueChange={(val) => val && updateRevertDelay(revertValue, val as "s" | "m")}>
+                                <SelectTrigger className="w-[80px]">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="s">s</SelectItem>
+                                    <SelectItem value="m">m</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div >
+                    </div >
+                </CardContent >
+            </Card >
         </div >
     )
 }
