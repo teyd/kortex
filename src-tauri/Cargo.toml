@@ -1,10 +1,10 @@
 [package]
-name = "dynres"
+name = "kortex"
 version = "0.5.0"
 description = "Dynamic resolution switching based on active process"
 authors = ["teyd"]
 license = "MIT"
-repository = "https://github.com/teyd/dynres"
+repository = "https://github.com/teyd/kortex"
 edition = "2021"
 rust-version = "1.77.2"
 
