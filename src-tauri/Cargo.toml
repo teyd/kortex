@@ -1,6 +1,6 @@
 [package]
 name = "kortex"
-version = "0.5.0"
+version = "0.6.0"
 description = "Dynamic resolution switching based on active process"
 authors = ["teyd"]
 license = "MIT"
