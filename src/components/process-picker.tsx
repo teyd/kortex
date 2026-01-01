@@ -24,6 +24,7 @@ interface ProcessPickerProps {
     processes: ProcessInfo[]
     value: string
     onChange: (value: string) => void
+    onRefresh?: () => void
     placeholder?: string
     className?: string
 }
@@ -32,13 +33,19 @@ export function ProcessPicker({
     processes,
     value,
     onChange,
+    onRefresh,
     placeholder = "Select process...",
     className,
 }: ProcessPickerProps) {
     const [open, setOpen] = React.useState(false)
 
     return (
-        <Popover open={open} onOpenChange={setOpen}>
+        <Popover open={open} onOpenChange={(isOpen) => {
+            setOpen(isOpen)
+            if (isOpen && onRefresh) {
+                onRefresh()
+            }
+        }}>
             <PopoverTrigger asChild>
                 <Button
                     variant="outline"

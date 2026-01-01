@@ -111,9 +111,7 @@ function ProfilesTab() {
                 })
             }
 
-            const procs = await fetchProcesses()
-            const uniqueProcs = Array.from(new Map(procs.map(p => [p.name, p])).values())
-            setProcesses(uniqueProcs)
+            await refreshProcesses()
 
             const resList = await getSupportedResolutions()
             setResolutions(resList)
@@ -121,6 +119,16 @@ function ProfilesTab() {
             console.error("Failed to load profiles data", e)
         } finally {
             setLoading(false)
+        }
+    }
+
+    const refreshProcesses = async () => {
+        try {
+            const procs = await fetchProcesses()
+            const uniqueProcs = Array.from(new Map(procs.map(p => [p.name, p])).values())
+            setProcesses(uniqueProcs)
+        } catch (e) {
+            console.error("Failed to fetch processes", e)
         }
     }
 
@@ -207,6 +215,7 @@ function ProfilesTab() {
                         processes={processes}
                         value={selectedProcess}
                         onChange={setSelectedProcess}
+                        onRefresh={refreshProcesses}
                         placeholder="Select a process..."
                         className="h-10 text-sm"
                     />
