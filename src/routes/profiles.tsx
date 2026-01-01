@@ -140,13 +140,6 @@ function ProfilesTab() {
         const [w, h] = resPickerValue.resolution.split('x').map(Number)
         const freq = parseInt(resPickerValue.refreshRate)
 
-        const newProfile: ResolutionProfile = {
-            processName: selectedProcess,
-            width: w,
-            height: h,
-            frequency: freq
-        }
-
         const config = await getConfig();
         // Check if exists, replace or add
         const existingIdx = config.automation.autoRes.profiles.findIndex(p => p.process === selectedProcess);

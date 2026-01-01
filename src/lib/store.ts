@@ -2,8 +2,19 @@ import { invoke } from '@tauri-apps/api/core';
 
 export type Theme = "dark" | "light" | "system";
 
-export interface ResolutionProfile {
+export interface Resolution {
+    width: number;
+    height: number;
+    frequency: number;
+}
+
+export interface ResolutionProfile extends Resolution {
     processName: string;
+}
+
+// Matches the JSON from backend
+export interface ProfileConfig {
+    process: string;
     width: number;
     height: number;
     frequency: number;
@@ -19,8 +30,8 @@ export interface AutomationSettings {
     mouseLock: MouseLockItem[];
     autoRes: {
         revertDelay: number;
-        defaultProfile?: { width: number, height: number, frequency: number };
-        profiles: { process: string; width: number; height: number; frequency: number }[];
+        defaultProfile?: Resolution;
+        profiles: ProfileConfig[];
     };
 }
 
@@ -57,19 +68,15 @@ export async function saveConfig(config: Config): Promise<void> {
     return await invoke('save_config', { config });
 }
 
-// Helper to keep compatibility with UI components that expect an array
-export interface ResolutionProfile extends Resolution {
-    processName: string;
-}
-
 export async function getProfilesList(): Promise<ResolutionProfile[]> {
     const config = await getConfig();
-    const profiles = config.automation?.profiles || {};
-    return Object.entries(profiles).map(([name, res]) => ({
-        processName: name,
-        width: res.width,
-        height: res.height,
-        frequency: res.frequency
+    // Map ProfileConfig (backend) to ResolutionProfile (frontend)
+    const list = config.automation.autoRes.profiles || [];
+    return list.map(p => ({
+        processName: p.process,
+        width: p.width,
+        height: p.height,
+        frequency: p.frequency
     }));
 }
 
