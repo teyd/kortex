@@ -12,7 +12,7 @@ use windows::Win32::{
         // Input::KeyboardAndMouse::ClipCursor,
         WindowsAndMessaging::{
             ClipCursor, DispatchMessageW, GetMessageW, GetWindowRect, GetWindowThreadProcessId,
-            TranslateMessage, EVENT_SYSTEM_FOREGROUND, MSG, WINEVENT_OUTOFCONTEXT,
+            IsIconic, TranslateMessage, EVENT_SYSTEM_FOREGROUND, MSG, WINEVENT_OUTOFCONTEXT,
         },
     },
 };
@@ -31,6 +31,7 @@ struct MonitorState {
     revert_pending: Option<Instant>, // Time when revert was requested
     locked_window: Option<usize>,
     locked_window_padding: (u32, u32),
+    locked_process: Option<String>,
 }
 
 // Global AppHandle for the hook callback
@@ -76,6 +77,12 @@ unsafe extern "system" fn win_event_hook(
 fn check_and_apply_window(hwnd: HWND, source: &str) {
     if hwnd.0.is_null() {
         return;
+    }
+
+    unsafe {
+        if IsIconic(hwnd).as_bool() {
+            return;
+        }
     }
 
     let mut process_id = 0;
@@ -157,6 +164,17 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
                     let _ = ClipCursor(Some(&rect));
                     state.locked_window = Some(hwnd.0 as usize);
                     state.locked_window_padding = padding;
+
+                    if state.locked_process.as_deref() != Some(&process_name) {
+                        state.locked_process = Some(process_name.clone());
+                        let _ = app_handle.emit(
+                            "mouse-lock-changed",
+                            serde_json::json!({
+                                "process": process_name,
+                                "status": "active"
+                            }),
+                        );
+                    }
                 }
             }
         } else {
@@ -164,6 +182,16 @@ fn check_and_apply_window(hwnd: HWND, source: &str) {
                 let _ = ClipCursor(None);
             }
             state.locked_window = None;
+
+            if state.locked_process.is_some() {
+                state.locked_process = None;
+                let _ = app_handle.emit(
+                    "mouse-lock-changed",
+                    serde_json::json!({
+                        "status": "inactive"
+                    }),
+                );
+            }
         }
 
         // Check for Resolution Profile
@@ -260,6 +288,7 @@ pub fn start_monitor_hook(app: AppHandle) {
             revert_pending: None,
             locked_window: None,
             locked_window_padding: (0, 0),
+            locked_process: None,
         })));
     }
 
@@ -383,4 +412,20 @@ pub fn start_monitor_hook(app: AppHandle) {
             }
         }
     });
+}
+
+pub fn force_revert() {
+    let state_arc = {
+        let guard = STATE.lock().unwrap();
+        guard.clone()
+    };
+
+    if let Some(state_arc) = state_arc {
+        let mut state = state_arc.lock().unwrap();
+        if state.revert_pending.is_some() {
+            // Set time to past to trigger immediate revert in watcher thread
+            state.revert_pending = Some(Instant::now() - Duration::from_secs(3600));
+            log::info!("Force revert requested. Timer expired manually.");
+        }
+    }
 }

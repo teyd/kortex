@@ -37,6 +37,11 @@ fn fetch_processes() -> Vec<ProcessInfo> {
 }
 
 #[tauri::command]
+fn force_revert() {
+    process_monitor::force_revert();
+}
+
+#[tauri::command]
 fn open_config_folder(app: tauri::AppHandle) {
     if let Ok(path) = app.path().app_config_dir() {
         if !path.exists() {
@@ -128,7 +133,8 @@ pub fn run() {
             open_config_folder,
             get_config,
             save_config,
-            get_app_version
+            get_app_version,
+            force_revert
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -106,6 +106,11 @@ export async function openConfigFolder() {
     return await invoke('open_config_folder');
 }
 
+
 export async function getAppVersion(): Promise<string> {
     return await invoke('get_app_version');
+}
+
+export async function forceRevert(): Promise<void> {
+    return await invoke('force_revert');
 }
