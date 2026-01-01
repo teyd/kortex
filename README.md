@@ -12,6 +12,8 @@ The application consists of a Rust-based backend (Tauri) that monitors process c
 
 When a recognized process (e.g., a specific game EXE) becomes the active window, kortex applies the resolution and refresh rate settings you've configured for that profile. When you tab out or close the process, it reverts to your default desktop settings after a configurable delay.
 
+Additionally, **Mouse Lock** profiles allow you to confine the mouse cursor to a specific window using the **`ClipCursor`** API. This is ideal for games or applications that don't natively restrict the cursor (e.g., in borderless windowed mode). You can configure padding to fine-tune the confinement area.
+
 ## Screenshots
 
 ![Res](https://i.nuuls.com/uv_fI.png)
